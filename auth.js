@@ -1,6 +1,6 @@
 /**
- * 🔐 MCHMUK Authentication Module
- * Multi-user Firebase Auth: login, logout, user management
+ * 🔐 MCHMUK Client-Side Local Authentication Module
+ * 100% Offline / Client-Side Session Management without external Firebase SDK
  */
 
 // ── State ────────────────────────────────────────────────────────────────────
@@ -10,14 +10,52 @@ let currentUserData = null;
 
 let loginSuccessCallback = null;
 let logoutSuccessCallback = null;
-let isLocalBypass = false;
+
+// Static user list for zero-friction client-side authentication
+const STATIC_USERS = {
+    'admin': {
+        username: 'admin',
+        email: 'admin@mchmuk.com',
+        displayName: 'ผู้ดูแลระบบสูงสุด (Admin)',
+        role: 'admin',
+        password: 'mchmuk49000'
+    },
+    'admin@mchmuk.com': {
+        username: 'admin',
+        email: 'admin@mchmuk.com',
+        displayName: 'ผู้ดูแลระบบสูงสุด (Admin)',
+        role: 'admin',
+        password: 'mchmuk49000'
+    },
+    'admin@moph.mail.go.th': {
+        username: 'admin',
+        email: 'admin@mchmuk.com',
+        displayName: 'ผู้ดูแลระบบสูงสุด (Admin)',
+        role: 'admin',
+        password: 'mchmuk49000'
+    },
+    'viewer': {
+        username: 'viewer',
+        email: 'viewer@mchmuk.com',
+        displayName: 'ผู้ดูข้อมูลทั่วไป (Viewer)',
+        role: 'viewer',
+        password: 'viewer49000'
+    },
+    'viewer@mchmuk.com': {
+        username: 'viewer',
+        email: 'viewer@mchmuk.com',
+        displayName: 'ผู้ดูข้อมูลทั่วไป (Viewer)',
+        role: 'viewer',
+        password: 'viewer49000'
+    }
+};
 
 // ── Init ─────────────────────────────────────────────────────────────────────
 function initAuth(onLogin, onLogout) {
     loginSuccessCallback = onLogin;
     logoutSuccessCallback = onLogout;
 
-    // Check if there is an active local bypass session
+    // Check if there is an active local session saved
     const savedSession = localStorage.getItem('mchmuk_local_session');
     if (savedSession) {
         try {
@@ -25,7 +63,7 @@ function initAuth(onLogin, onLogout) {
             currentUser     = session.user;
             currentUserRole = session.role;
             currentUserData = session.data;
-            isLocalBypass   = true;
+            
             setTimeout(() => {
                 onLogin(currentUser, currentUserRole, currentUserData);
             }, 100);
@@ -35,245 +73,82 @@ function initAuth(onLogin, onLogout) {
         }
     }
 
-    fbAuth.onAuthStateChanged(async (user) => {
-        if (isLocalBypass) return; // Prevent overwriting bypass state
-
-        if (user) {
-            currentUser     = user;
-            currentUserData = await fetchUserProfile(user.uid);
-            currentUserRole = currentUserData?.role || 'viewer';
-            await fbDb.collection('users').doc(user.uid)
-                .update({ lastLogin: firebase.firestore.FieldValue.serverTimestamp() })
-                .catch(() => {});
-            onLogin(user, currentUserRole, currentUserData);
-        } else {
-            currentUser = currentUserRole = currentUserData = null;
-            onLogout();
-        }
-    });
-}
-
-async function fetchUserProfile(uid) {
-    try {
-        const doc = await fbDb.collection('users').doc(uid).get();
-        return doc.exists ? doc.data() : null;
-    } catch { return null; }
+    // Auto trigger logout state on load if no active session
+    setTimeout(() => {
+        onLogout();
+    }, 100);
 }
 
 // ── Login / Logout ────────────────────────────────────────────────────────────
-async function login(email, password) {
-    const normalizedEmail = email.toLowerCase().trim();
-    const isAdminAccount = (normalizedEmail === 'admin' || normalizedEmail === 'admin@mchmuk.com' || normalizedEmail === 'admin@moph.mail.go.th') && password === 'mchmuk49000';
-    const targetEmail = isAdminAccount ? 'admin@mchmuk.com' : email;
+async function login(usernameOrEmail, password) {
+    // Simulate minor lag for satisfying cyberpunk styling
+    await new Promise(r => setTimeout(r, 600));
 
-    // 1. Direct Local Bypass check if Firebase is not yet configured or is in placeholder mode
-    const isFirebasePlaceholder = firebase.app().options.apiKey === "YOUR_API_KEY";
+    const key = usernameOrEmail.toLowerCase().trim();
+    const userProfile = STATIC_USERS[key];
 
-    if (isAdminAccount && isFirebasePlaceholder) {
-        setLocalBypassAdmin();
-        return { ok: true };
-    }
-
-    try {
-        // Try Firebase Authentication
-        await fbAuth.signInWithEmailAndPassword(targetEmail, password);
-
-        // If successful and it is the admin credential, ensure Firestore has their role assigned as admin!
-        if (isAdminAccount) {
-            const uid = fbAuth.currentUser.uid;
-            const profile = await fetchUserProfile(uid);
-            if (!profile || profile.role !== 'admin') {
-                await fbDb.collection('users').doc(uid).set({
-                    email: targetEmail,
-                    displayName: 'System Admin',
-                    role: 'admin',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).catch(() => {});
-            }
-        }
-        return { ok: true };
-    } catch (err) {
-        console.warn("Firebase Auth attempt failed:", err);
-
-        // If the admin account doesn't exist yet on their active Firebase, try to auto-create it!
-        if (isAdminAccount && err.code === 'auth/user-not-found') {
-            try {
-                const regRes = await fbAuth.createUserWithEmailAndPassword(targetEmail, password);
-                const uid = regRes.user.uid;
-                await fbDb.collection('users').doc(uid).set({
-                    email: targetEmail,
-                    displayName: 'System Admin',
-                    role: 'admin',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }).catch(() => {});
-
-                await regRes.user.updateProfile({
-                    displayName: 'System Admin'
-                }).catch(() => {});
-
-                return { ok: true };
-            } catch (regErr) {
-                console.error("Auto admin creation failed, falling back to local...", regErr);
-            }
-        }
-
-        // If API key is invalid or network issues, or it's the admin, gracefully fallback to local offline mode
-        if (isAdminAccount || err.code === 'auth/invalid-api-key' || err.message.includes('API key') || err.message.includes('network')) {
-            setLocalBypassAdmin();
-            if (isAdminAccount) {
-                showToast('⚠️ ล็อกอินเข้าใช้งานระบบผ่านโหมด Local Bypass เรียบร้อยแล้ว', 'info', 5000);
-            } else {
-                showToast('⚠️ เกิดข้อผิดพลาดเชื่อมต่อ Firebase: เข้าสู่โหมดจำลองระบบชั่วคราว', 'warn', 5000);
-            }
-            return { ok: true };
-        }
-
-        const msg = {
-            'auth/user-not-found':   'ไม่พบบัญชีผู้ใช้นี้',
-            'auth/wrong-password':   'รหัสผ่านไม่ถูกต้อง',
-            'auth/invalid-email':    'รูปแบบอีเมลไม่ถูกต้อง',
-            'auth/invalid-credential': 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
-            'auth/too-many-requests':'พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอสักครู่'
+    if (userProfile && userProfile.password === password) {
+        currentUser = {
+            email: userProfile.email,
+            uid: 'local-uid-' + userProfile.username,
+            displayName: userProfile.displayName
         };
-        return { ok: false, error: msg[err.code] || err.message };
-    }
-}
+        currentUserRole = userProfile.role;
+        currentUserData = {
+            displayName: userProfile.displayName,
+            email: userProfile.email,
+            role: userProfile.role,
+            createdAt: new Date()
+        };
 
-function setLocalBypassAdmin() {
-    currentUser = {
-        email: 'admin@mchmuk.com',
-        uid: 'local-admin-uid',
-        displayName: 'System Admin'
-    };
-    currentUserRole = 'admin';
-    currentUserData = {
-        displayName: 'System Admin',
-        email: 'admin@mchmuk.com',
-        role: 'admin',
-        createdAt: new Date()
-    };
-    isLocalBypass = true;
-    localStorage.setItem('mchmuk_local_session', JSON.stringify({
-        user: currentUser,
-        role: currentUserRole,
-        data: currentUserData
-    }));
-    if (loginSuccessCallback) {
-        loginSuccessCallback(currentUser, currentUserRole, currentUserData);
-    }
-}
+        // Persist session locally
+        localStorage.setItem('mchmuk_local_session', JSON.stringify({
+            user: currentUser,
+            role: currentUserRole,
+            data: currentUserData
+        }));
 
-async function logout() {
-    if (isLocalBypass) {
-        isLocalBypass = false;
-        localStorage.removeItem('mchmuk_local_session');
-        currentUser = currentUserRole = currentUserData = null;
-        if (logoutSuccessCallback) {
-            logoutSuccessCallback();
+        if (loginSuccessCallback) {
+            loginSuccessCallback(currentUser, currentUserRole, currentUserData);
         }
-        return;
+        return { ok: true, role: userProfile.role };
     }
-    await fbAuth.signOut().catch(() => {});
-}
 
-async function sendPasswordReset(email) {
-    try {
-        await fbAuth.sendPasswordResetEmail(email);
-        return { ok: true };
-    } catch (err) {
-        return { ok: false, error: err.message };
-    }
+    // Authentication failure
+    return { ok: false, error: 'ระบุผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง' };
 }
 
 async function registerUser(email, password, displayName) {
-    try {
-        const result = await fbAuth.createUserWithEmailAndPassword(email, password);
-        const newUid = result.user.uid;
-
-        // Check if this is the first user in the system to automatically grant Admin role!
-        const usersSnap = await fbDb.collection('users').limit(1).get().catch(() => ({ empty: true }));
-        const role = usersSnap.empty ? 'admin' : 'viewer';
-
-        await fbDb.collection('users').doc(newUid).set({
-            email,
-            displayName: displayName || email.split('@')[0],
-            role: role,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-
-        // Set the current user's profile display name
-        if (result.user) {
-            await result.user.updateProfile({
-                displayName: displayName || email.split('@')[0]
-            }).catch(() => {});
-        }
-
-        return { ok: true, role };
-    } catch (err) {
-        const msg = {
-            'auth/email-already-in-use': 'อีเมลนี้มีผู้ใช้งานแล้ว',
-            'auth/weak-password': 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
-            'auth/invalid-email': 'รูปแบบอีเมลไม่ถูกต้อง'
-        };
-        return { ok: false, error: msg[err.code] || err.message };
+    // Since we are client-side only, we dynamically insert into STATIC_USERS!
+    await new Promise(r => setTimeout(r, 500));
+    
+    const key = email.toLowerCase().trim();
+    if (STATIC_USERS[key]) {
+        return { ok: false, error: 'อีเมลนี้มีผู้ใช้งานในระบบอยู่แล้ว' };
     }
+
+    const newProfile = {
+        username: key.split('@')[0],
+        email: email,
+        displayName: displayName || key.split('@')[0],
+        role: 'viewer', // registered users are always viewers by default
+        password: password
+    };
+
+    STATIC_USERS[key] = newProfile;
+    STATIC_USERS[newProfile.username] = newProfile;
+
+    // Log them in immediately!
+    return login(email, password);
 }
 
-// ── Admin: User Management ────────────────────────────────────────────────────
-async function adminCreateUser(email, password, displayName, role, hosCode = '') {
-    if (currentUserRole !== 'admin') return { ok: false, error: 'ไม่มีสิทธิ์' };
-
-    // ใช้ secondary app เพื่อไม่ให้ sign out admin ออก
-    const secondary = firebase.initializeApp(firebase.app().options, 'secondary_' + Date.now());
-    try {
-        const result = await secondary.auth().createUserWithEmailAndPassword(email, password);
-        const newUid = result.user.uid;
-        await secondary.auth().signOut();
-
-        await fbDb.collection('users').doc(newUid).set({
-            email, displayName, role, hosCode,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUser.uid
-        });
-        return { ok: true, uid: newUid };
-    } catch (err) {
-        const msg = {
-            'auth/email-already-in-use': 'อีเมลนี้มีผู้ใช้งานแล้ว',
-            'auth/weak-password': 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร'
-        };
-        return { ok: false, error: msg[err.code] || err.message };
-    } finally {
-        secondary.delete().catch(() => {});
+async function logout() {
+    localStorage.removeItem('mchmuk_local_session');
+    currentUser = currentUserRole = currentUserData = null;
+    if (logoutSuccessCallback) {
+        logoutSuccessCallback();
     }
-}
-
-async function adminListUsers() {
-    if (currentUserRole !== 'admin') return [];
-    try {
-        const snap = await fbDb.collection('users').orderBy('createdAt', 'desc').get();
-        return snap.docs.map(d => ({ uid: d.id, ...d.data() }));
-    } catch { return []; }
-}
-
-async function adminUpdateUserRole(uid, role) {
-    if (currentUserRole !== 'admin') return { ok: false, error: 'ไม่มีสิทธิ์' };
-    try {
-        await fbDb.collection('users').doc(uid).update({ role });
-        return { ok: true };
-    } catch (err) {
-        return { ok: false, error: err.message };
-    }
-}
-
-async function adminDeleteUser(uid) {
-    if (currentUserRole !== 'admin') return { ok: false, error: 'ไม่มีสิทธิ์' };
-    if (uid === currentUser.uid) return { ok: false, error: 'ไม่สามารถลบตัวเองได้' };
-    try {
-        await fbDb.collection('users').doc(uid).delete();
-        return { ok: true };
-    } catch (err) {
-        return { ok: false, error: err.message };
-    }
+    return { ok: true };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
