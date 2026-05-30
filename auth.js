@@ -34,19 +34,26 @@ const STATIC_USERS = {
         role: 'admin',
         password: 'mchmuk49000'
     },
-    'viewer': {
-        username: 'viewer',
-        email: 'viewer@mchmuk.com',
-        displayName: 'ผู้ดูข้อมูลทั่วไป (Viewer)',
+    'mchmuk': {
+        username: 'mchmuk',
+        email: 'mchmuk@mchmuk.com',
+        displayName: 'เจ้าหน้าที่ทั่วไป (Viewer)',
         role: 'viewer',
-        password: 'viewer49000'
+        password: 'mchmuk'
     },
-    'viewer@mchmuk.com': {
-        username: 'viewer',
-        email: 'viewer@mchmuk.com',
-        displayName: 'ผู้ดูข้อมูลทั่วไป (Viewer)',
+    'mchmuk@mchmuk.com': {
+        username: 'mchmuk',
+        email: 'mchmuk@mchmuk.com',
+        displayName: 'เจ้าหน้าที่ทั่วไป (Viewer)',
         role: 'viewer',
-        password: 'viewer49000'
+        password: 'mchmuk'
+    },
+    'viewer': {
+        username: 'mchmuk',
+        email: 'mchmuk@mchmuk.com',
+        displayName: 'เจ้าหน้าที่ทั่วไป (Viewer)',
+        role: 'viewer',
+        password: 'mchmuk'
     }
 };
 
@@ -91,8 +98,8 @@ async function login(usernameOrEmail, password) {
     if (!userProfile) {
         if (key.includes('admin')) {
             userProfile = STATIC_USERS['admin'];
-        } else if (key.includes('viewer')) {
-            userProfile = STATIC_USERS['viewer'];
+        } else if (key.includes('viewer') || key.includes('mchmuk')) {
+            userProfile = STATIC_USERS['mchmuk'];
         }
     }
 
