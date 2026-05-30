@@ -2,6 +2,7 @@
  * 🔐 MCHMUK Client-Side Local Authentication Module
  * 100% Offline / Client-Side Session Management without external Firebase SDK
  */
+console.log("🔐 MCHMUK Auth Module v1.2.8 Loaded Successfully");
 
 // ── State ────────────────────────────────────────────────────────────────────
 let currentUser     = null;

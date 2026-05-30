@@ -5,6 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
+console.log("💎 MCHMUK Core Engine v1.2.8 Loaded Successfully");
 
 // --- Global Application State ---
 let appState = {
