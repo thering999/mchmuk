@@ -314,13 +314,22 @@ function loadSheetData(sheetName) {
     appState.currentSheetName = sheetName;
 
     const sheet = appState.workbook.Sheets[sheetName];
+
+    // --- ✅ อ่าน 2 ชุด: parsed (สำหรับคำนวณ) + cellText (สำหรับ export) ---
+    // cellText:true เพิ่ม .w (formatted text) ใน each cell — ใช้ XLSX.read ด้วย cellText:true
+    // แต่เราสร้าง rawDataText แยกจาก sheet object โดยใช้ sheet_to_json raw:false
     const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    const jsonDataText = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
 
     if (jsonData.length === 0) {
-        alert("แผ่นงานนี้ไม่มีข้อมูล หรือไม่พบข้อมูลหัวตาราง!");
+        showToast('⚠️ แผ่นงานนี้ไม่มีข้อมูล หรือไม่พบข้อมูลหัวตาราง!', 'warn', 5000);
         toggleLoader(false);
         return;
     }
+
+    // Tag แต่ละ row ด้วย index ดั้งเดิม เพื่อ map กลับไปหา rawDataText ตอน export
+    jsonData.forEach((row, idx) => { row.__rowIdx__ = idx; });
+    appState.rawDataText = jsonDataText;
 
     // Post-process rows to preserve leading zeros for medical and standard identifiers!
     jsonData.forEach(row => {
@@ -330,27 +339,35 @@ function loadSheetData(sheetName) {
             
             const lowerKey = key.toLowerCase();
             
-            // 1. Hospital Code (hoscode / hospcode / hcode): always 5 characters padded with leading zeros!
+            // 1. Hospital Code (hoscode / hospcode / hcode): always 5 characters padded
             if (lowerKey === 'hoscode' || lowerKey === 'hospcode' || lowerKey === 'hcode') {
                 const numericStr = String(val).trim();
                 if (!isNaN(numericStr) && numericStr.length > 0 && !numericStr.includes('.')) {
                     row[key] = numericStr.padStart(5, '0');
+                    // Sync ไปที่ rawDataText ด้วย
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][key] = row[key];
+                    }
                 }
             }
-            
             // 2. Nation / Country / Area Codes: e.g. nation 099
             else if (lowerKey === 'nation') {
                 const numericStr = String(val).trim();
                 if (!isNaN(numericStr) && numericStr.length > 0 && !numericStr.includes('.')) {
                     row[key] = numericStr.padStart(3, '0');
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][key] = row[key];
+                    }
                 }
             }
-            
             // 3. Citizen ID (cid): always 13 characters!
             else if (lowerKey === 'cid') {
                 const numericStr = String(val).trim();
                 if (!isNaN(numericStr) && numericStr.length > 0 && !numericStr.includes('.')) {
                     row[key] = numericStr.padStart(13, '0');
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][key] = row[key];
+                    }
                 }
             }
         });
@@ -358,10 +375,12 @@ function loadSheetData(sheetName) {
 
     appState.rawData = jsonData;
 
-    // Collect unique keys/headers
+    // Collect unique keys/headers (exclude internal __rowIdx__)
     const headerSet = new Set();
     jsonData.forEach(row => {
-        Object.keys(row).forEach(key => headerSet.add(key));
+        Object.keys(row).forEach(key => {
+            if (key !== '__rowIdx__') headerSet.add(key);
+        });
     });
     appState.headers = Array.from(headerSet);
 
@@ -1466,31 +1485,33 @@ function renderPaginationControls(totalPages) {
 // ==========================================================================
 
 /**
- * Serialize a cell value for export — preserves original format:
- * - Date objects → YYYY-MM-DD (ISO format, คงรูปแบบต้นฉบับ ไม่มี "Wed May...")
- * - Large numbers (cid/didstd) → plain string ไม่มี scientific notation
- * - String/number → คงเดิม
+ * ✅ ดึงค่าต้นฉบับจาก rawDataText (Excel formatted text) สำหรับ export
+ * - ใช้ row.__rowIdx__ เพื่อ map กลับไปหา text version
+ * - Fallback ไปใช้ raw val ถ้าไม่มี rawDataText
  */
-function serializeValueForExport(val, header) {
-    if (val === undefined || val === null || val === '') return '';
+function getExportValue(row, header) {
+    // ใช้ text version จาก Excel ก่อน (ต้นฉบับ, ไม่มีการ convert)
+    const textRow = appState.rawDataText && row.__rowIdx__ !== undefined
+        ? appState.rawDataText[row.__rowIdx__]
+        : null;
 
-    // 1. Date object → YYYY-MM-DD
+    if (textRow && textRow[header] !== undefined && textRow[header] !== null) {
+        return String(textRow[header]);
+    }
+
+    // Fallback: ใช้ parsed value แต่ serialize ให้ถูกต้อง
+    const val = row[header];
+    if (val === undefined || val === null || val === '') return '';
     if (val instanceof Date && !isNaN(val.getTime())) {
+        // YYYY-MM-DD format
         const y = val.getFullYear();
         const m = String(val.getMonth() + 1).padStart(2, '0');
         const d = String(val.getDate()).padStart(2, '0');
         return `${y}-${m}-${d}`;
     }
-
-    // 2. Large numbers (cid, didstd, etc.) that JS converts to scientific notation
-    if (typeof val === 'number') {
-        // ถ้า number ใหญ่เกิน safe integer ให้ใช้ toFixed(0) ป้องกัน 1E+23
-        if (Math.abs(val) >= 1e15 || (Math.abs(val) < 1e-6 && val !== 0)) {
-            return val.toFixed(0);
-        }
-        return String(val);
+    if (typeof val === 'number' && (Math.abs(val) >= 1e15 || String(val).includes('e'))) {
+        return val.toFixed(0);
     }
-
     return String(val);
 }
 
@@ -1503,10 +1524,8 @@ function exportCSV() {
 
     appState.filteredData.forEach(row => {
         const values = appState.headers.map(header => {
-            const val = row[header];
-            const serialized = serializeValueForExport(val, header);
-            // RFC 4180 escaping
-            const escaped = serialized.replace(/"/g, '""');
+            const val = getExportValue(row, header);
+            const escaped = val.replace(/"/g, '""');
             return `"${escaped}"`;
         });
         csvRows.push(values.join(','));
@@ -1529,12 +1548,11 @@ function exportCSV() {
 function exportJSON() {
     if (appState.filteredData.length === 0) return;
 
-    // Serialize ทุก field ให้ถูกต้องก่อน export
+    // ใช้ getExportValue เพื่อให้ได้ค่าต้นฉบับจาก Excel
     const cleanData = appState.filteredData.map(row => {
         const cleanRow = {};
         appState.headers.forEach(header => {
-            const val = row[header];
-            cleanRow[header] = serializeValueForExport(val, header);
+            cleanRow[header] = getExportValue(row, header);
         });
         return cleanRow;
     });
