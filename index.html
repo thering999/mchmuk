@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCHMUK - Holographic Excel Analytics Dashboard</title>
+    
+    <!-- Custom Vanilla CSS Design System -->
+    <link rel="stylesheet" href="style.css">
+    
+    <style>
+        /* --- Specialized Custom Styles for HDC MOPH Mode --- */
+        .moph-alert-banner {
+            background: linear-gradient(90deg, rgba(0, 242, 254, 0.1) 0%, rgba(157, 78, 221, 0.15) 100%);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            border-radius: var(--border-radius-md);
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 8px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 15px rgba(0, 242, 254, 0.05);
+        }
+        .moph-alert-banner::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan);
+        }
+        .moph-alert-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .moph-alert-icon {
+            width: 38px;
+            height: 38px;
+            background: rgba(0, 242, 254, 0.15);
+            color: var(--neon-cyan);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 10px var(--neon-cyan-glow);
+        }
+        .moph-alert-title h4 {
+            font-family: var(--font-display);
+            font-size: 0.95rem;
+            color: var(--neon-cyan);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+        .moph-alert-title p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+        }
+        .target-badge {
+            background: rgba(255, 0, 127, 0.15);
+            color: var(--neon-pink);
+            border: 1px solid var(--neon-pink);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-family: var(--font-display);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px var(--neon-pink-glow);
+        }
+        .target-badge.met {
+            background: rgba(0, 255, 135, 0.15);
+            color: #00ff87;
+            border: 1px solid #00ff87;
+            box-shadow: 0 0 10px rgba(0, 255, 135, 0.3);
+        }
+        
+        /* Age Segment Filter Buttons */
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .filter-tab-btn {
+            background: rgba(11, 15, 25, 0.8);
+            border: 1px solid var(--border-light);
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 600;
+            transition: var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .filter-tab-btn:hover {
+            color: var(--text-primary);
+            border-color: var(--neon-cyan);
+        }
+        .filter-tab-btn.active {
+            background: linear-gradient(135deg, rgba(0, 242, 254, 0.2) 0%, rgba(157, 78, 221, 0.2) 100%);
+            border-color: var(--neon-cyan);
+            color: var(--neon-cyan);
+            box-shadow: 0 0 10px var(--neon-cyan-glow);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- 💎 Futuristic Header -->
+        <header>
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i data-lucide="activity"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>MCHMUK Analytics</h1>
+                    <span>Holographic Dashboard System v1.1</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" id="btn-load-local">
+                    <i data-lucide="database"></i> Load local Excel
+                </button>
+            </div>
+        </header>
+
+        <!-- 📌 MOPH HDC Banner -->
+        <div class="moph-alert-banner" id="moph-banner" style="display: none;">
+            <div class="moph-alert-content">
+                <div class="moph-alert-icon">
+                    <i data-lucide="shield-check"></i>
+                </div>
+                <div class="moph-alert-title">
+                    <h4>วิเคราะห์รายงานมาตรฐานกระทรวงสาธารณสุข (HDC Mode)</h4>
+                    <p>ร้อยละของเด็กอายุ 6 เดือน – 5 ปี ได้รับยาน้ำเสริมธาตุเหล็ก (เป้าหมาย: ร้อยละ 75.0 ขึ้นไป)</p>
+                </div>
+            </div>
+            <div class="target-badge" id="moph-target-badge">
+                เป้าหมาย: 75.0%
+            </div>
+        </div>
+
+        <!-- 🚀 Upload & File Information Section -->
+        <section class="upload-container">
+            <!-- Drag & Drop Dropzone -->
+            <div class="dropzone-card" id="dropzone">
+                <input type="file" id="file-input" class="file-input" accept=".xlsx, .xls, .csv">
+                <div class="dropzone-icon">
+                    <i data-lucide="upload-cloud"></i>
+                </div>
+                <div class="dropzone-text">
+                    <h3>นำเข้าข้อมูลไฟล์ Excel หรือ CSV</h3>
+                    <p>ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์ของคุณ</p>
+                </div>
+                <button class="btn" onclick="document.getElementById('file-input').click()">
+                    <i data-lucide="file-spreadsheet"></i> เลือกไฟล์ Excel
+                </button>
+            </div>
+
+            <!-- File Details Card -->
+            <div class="file-info-card">
+                <div class="info-row">
+                    <span class="info-label"><i data-lucide="file"></i> ชื่อไฟล์</span>
+                    <span class="info-value" id="val-filename">ไม่มีการโหลดไฟล์</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i data-lucide="database"></i> ขนาดไฟล์</span>
+                    <span class="info-value" id="val-filesize">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i data-lucide="layers"></i> จำนวนแผ่นงาน (Sheet)</span>
+                    <span class="info-value" id="val-sheets">-</span>
+                </div>
+                <div class="info-row" id="row-import-time" style="display: none;">
+                    <span class="info-label"><i data-lucide="calendar"></i> นำเข้าล่าสุดเมื่อ</span>
+                    <span class="info-value text-glow" id="val-import-time" style="color: var(--neon-cyan); font-weight: bold;">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i data-lucide="check-circle-2"></i> สถานะ</span>
+                    <span class="status-badge pending" id="val-status">พร้อมทำงาน</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 📊 Advanced Control Panel / Dimension Selector -->
+        <section class="control-panel" id="panel-dimensions" style="display: none;">
+            <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span><i data-lucide="sliders"></i> ตัวเลือกมิติข้อมูลและสถิติวิเคราะห์ (Data Mapping)</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);" id="moph-mode-notice"></span>
+            </div>
+            
+            <div class="control-grid">
+                <!-- Sheet Selector -->
+                <div class="control-group">
+                    <label for="select-sheet"><i data-lucide="layers"></i> เลือกแผ่นงาน (Active Sheet)</label>
+                    <select id="select-sheet" class="form-select"></select>
+                </div>
+                <!-- X-Axis Selection -->
+                <div class="control-group">
+                    <label for="select-x-axis"><i data-lucide="git-commit"></i> แกน X (หมวดหมู่ / วันที่)</label>
+                    <select id="select-x-axis" class="form-select"></select>
+                </div>
+                <!-- Y-Axis Selection -->
+                <div class="control-group">
+                    <label for="select-y-axis"><i data-lucide="trending-up"></i> แกน Y (ค่าสำหรับคำนวณ)</label>
+                    <select id="select-y-axis" class="form-select"></select>
+                </div>
+                <!-- Aggregation Mode -->
+                <div class="control-group">
+                    <label for="select-aggregate"><i data-lucide="calculator"></i> การคำนวณ (Aggregation)</label>
+                    <select id="select-aggregate" class="form-select">
+                        <option value="SUM">ผลรวม (SUM)</option>
+                        <option value="AVERAGE">ค่าเฉลี่ย (AVERAGE)</option>
+                        <option value="COUNT">จำนวนนับ (COUNT)</option>
+                        <option value="MAX">ค่ามากที่สุด (MAX)</option>
+                        <option value="MIN">ค่าน้อยที่สุด (MIN)</option>
+                    </select>
+                </div>
+                <!-- Group By (Legend Series) -->
+                <div class="control-group">
+                    <label for="select-group-by"><i data-lucide="split"></i> แยกกลุ่มอนุกรม (Group By - Optional)</label>
+                    <select id="select-group-by" class="form-select">
+                        <option value="">-- ไม่จัดกลุ่ม --</option>
+                    </select>
+                </div>
+            </div>
+        </section>
+
+        <!-- 🧪 Loading Overlay -->
+        <div class="loading-overlay" id="loading-overlay">
+            <div class="cyber-spinner"></div>
+            <div class="loading-text">กำลังวิเคราะห์ข้อมูล...</div>
+        </div>
+
+        <!-- 💡 Welcome/Instruction Box when no data -->
+        <div class="table-card" id="welcome-message" style="text-align: center; padding: 50px;">
+            <div style="font-size: 4rem; color: var(--neon-cyan); margin-bottom: 20px; animation: float 3s ease-in-out infinite;">
+                <i data-lucide="bar-chart-3" style="width: 80px; height: 80px;"></i>
+            </div>
+            <h2 style="font-family: var(--font-display); letter-spacing: 2px; margin-bottom: 12px; color: var(--neon-cyan);">ยินดีต้อนรับสู่ระบบจำลองข้อมูลแบบมีมิติ</h2>
+            <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 24px auto;">
+                กรุณาอัปโหลดไฟล์ Excel ของคุณ หรือกดปุ่ม <strong>"Load local Excel"</strong> เพื่อดึงข้อมูลไฟล์ <code>tmp_exchange_data.xlsx</code> ที่มีอยู่ในระบบโดยอัตโนมัติ 
+                เพื่อสร้างแดชบอร์ดล้ำสมัยที่วิเคราะห์เปรียบเทียบข้อมูลได้อย่างทันใจ!
+            </p>
+            <div>
+                <button class="btn" id="btn-demo-data">
+                    <i data-lucide="sparkles"></i> เริ่มด้วยข้อมูลตัวอย่าง (Demo Data)
+                </button>
+            </div>
+        </div>
+
+        <!-- ⚡ Main Analytics Dashboard Area -->
+        <div id="dashboard-content" style="display: none; flex-direction: column; gap: 24px;">
+            
+            <!-- Quick Age Filters (Visible only in MOPH mode) -->
+            <div class="filter-tabs" id="moph-age-filters" style="display: none;">
+                <button class="filter-tab-btn active" data-age-range="all">
+                    <i data-lucide="users"></i> เด็กเป้าหมายทุกคน (6 เดือน - 5 ปี)
+                </button>
+                <button class="filter-tab-btn" data-age-range="6-12">
+                    <i data-lucide="baby"></i> เฉพาะกลุ่ม 6 - 12 เดือน (ยาน้ำเสริมธาตุเหล็กสัปดาห์ละ 1 ครั้ง)
+                </button>
+                <button class="filter-tab-btn" data-age-range="36-60">
+                    <i data-lucide="smile"></i> เฉพาะกลุ่ม 3 - 5 ปี (ยาน้ำเสริมธาตุเหล็กสัปดาห์ละ 1 ครั้ง)
+                </button>
+            </div>
+
+            <!-- Quick HCT Filters (Visible only in MOPH mode) -->
+            <div class="filter-tabs" id="moph-hct-filters" style="display: none; margin-top: 8px;">
+                <button class="filter-tab-btn active" data-hct-status="all">
+                    <i data-lucide="filter"></i> เด็กเป้าหมายทั้งหมด
+                </button>
+                <button class="filter-tab-btn" data-hct-status="not-tested">
+                    <i data-lucide="x-circle"></i> ยังไม่เจาะ Lab HCT
+                </button>
+                <button class="filter-tab-btn" data-hct-status="tested">
+                    <i data-lucide="check-circle-2"></i> เจาะ Lab HCT แล้ว
+                </button>
+                <button class="filter-tab-btn" data-hct-status="anemia">
+                    <i data-lucide="heart-off"></i> เจาะแล้วซีด (Anemia)
+                </button>
+                <button class="filter-tab-btn" data-hct-status="normal">
+                    <i data-lucide="heart"></i> เจาะแล้วไม่ซีด (Normal)
+                </button>
+            </div>
+
+            <!-- Key Metrics Cards -->
+            <section class="metrics-grid">
+                <!-- KPI 1 -->
+                <div class="kpi-card cyan">
+                    <div class="kpi-header">
+                        <span class="kpi-title" id="kpi-1-title">จำนวนรายการข้อมูลทั้งหมด</span>
+                        <div class="kpi-icon"><i data-lucide="database"></i></div>
+                    </div>
+                    <div class="kpi-value" id="kpi-total-rows">0</div>
+                    <div class="kpi-trend positive" id="kpi-1-subtitle">
+                        <i data-lucide="check-circle-2"></i> ทำการวิเคราะห์ครบทุกแถวสำเร็จ
+                    </div>
+                </div>
+                <!-- KPI 2 -->
+                <div class="kpi-card purple">
+                    <div class="kpi-header">
+                        <span class="kpi-title" id="kpi-sum-title">ผลรวมมิติที่เลือก</span>
+                        <div class="kpi-icon"><i data-lucide="sigma"></i></div>
+                    </div>
+                    <div class="kpi-value" id="kpi-total-sum">0</div>
+                    <div class="kpi-trend positive" id="kpi-sum-subtitle">
+                        ค่าประมวลผลสรุปยอด
+                    </div>
+                </div>
+                <!-- KPI 3 -->
+                <div class="kpi-card pink">
+                    <div class="kpi-header">
+                        <span class="kpi-title" id="kpi-avg-title">ค่าเฉลี่ยแถว</span>
+                        <div class="kpi-icon"><i data-lucide="percent"></i></div>
+                    </div>
+                    <div class="kpi-value" id="kpi-total-avg">0</div>
+                    <div class="kpi-trend neutral" id="kpi-avg-subtitle">
+                        วิเคราะห์ตามแกน X-Y
+                    </div>
+                </div>
+                <!-- KPI 4 -->
+                <div class="kpi-card cyan">
+                    <div class="kpi-header">
+                        <span class="kpi-title" id="kpi-4-title">จำนวนกลุ่มไม่ซ้ำ (Unique)</span>
+                        <div class="kpi-icon"><i data-lucide="hash"></i></div>
+                    </div>
+                    <div class="kpi-value" id="kpi-unique-categories">0</div>
+                    <div class="kpi-trend positive" id="kpi-4-subtitle">
+                        <i data-lucide="activity"></i> การกระจายตัวของกลุ่มข้อมูล
+                    </div>
+                </div>
+            </section>
+
+            <!-- Interactive Visualizations Grid -->
+            <section class="charts-grid">
+                <!-- Area Chart: Time-series / Progression -->
+                <div class="chart-card col-8">
+                    <div class="chart-header">
+                        <span class="chart-title" id="chart-area-title"><i data-lucide="trending-up"></i> รายงานแนวโน้มข้อมูล (Area/Line Chart)</span>
+                    </div>
+                    <div class="chart-body" id="chart-area"></div>
+                </div>
+                
+                <!-- Donut Chart: Distribution -->
+                <div class="chart-card col-4">
+                    <div class="chart-header">
+                        <span class="chart-title" id="chart-donut-title"><i data-lucide="pie-chart"></i> สัดส่วนองค์ประกอบ (Donut Chart)</span>
+                    </div>
+                    <div class="chart-body" id="chart-donut"></div>
+                </div>
+
+                <!-- Column Chart: Comparison -->
+                <div class="chart-card col-6">
+                    <div class="chart-header">
+                        <span class="chart-title" id="chart-bar-title"><i data-lucide="bar-chart-4"></i> เปรียบเทียบตามประเภท (Bar/Column Chart)</span>
+                    </div>
+                    <div class="chart-body" id="chart-bar"></div>
+                </div>
+
+                <!-- Radar Chart: Multi-dimensional Performance -->
+                <div class="chart-card col-6">
+                    <div class="chart-header">
+                        <span class="chart-title" id="chart-radar-title"><i data-lucide="radar"></i> แผนภูมิเรดาร์แสดงประสิทธิภาพ (Radar Chart)</span>
+                    </div>
+                    <div class="chart-body" id="chart-radar"></div>
+                </div>
+            </section>
+
+            <!-- Interactive Cyber-Grid Table -->
+            <section class="table-card">
+                <div class="chart-header" style="margin-bottom: 5px;">
+                    <span class="chart-title"><i data-lucide="table"></i> ตารางวิเคราะห์และค้นหาข้อมูลอย่างง่าย (Dynamic Grid)</span>
+                </div>
+                <div class="table-toolbar">
+                    <div class="search-wrapper">
+                        <i data-lucide="search"></i>
+                        <input type="text" class="search-input" id="table-search" placeholder="ค้นหาข้อมูลทุกคอลัมน์...">
+                    </div>
+                    <div class="table-actions">
+                        <button class="btn btn-secondary" id="btn-export-csv"><i data-lucide="download"></i> Export CSV</button>
+                        <button class="btn btn-secondary" id="btn-export-json"><i data-lucide="code"></i> Export JSON</button>
+                    </div>
+                </div>
+                
+                <!-- Scrollable Table -->
+                <div class="table-container">
+                    <table id="data-table">
+                        <thead>
+                            <tr id="table-header">
+                                <!-- Generated Dynamic Headers -->
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Generated Dynamic Rows -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Sleek Pagination -->
+                <div class="pagination">
+                    <div class="pagination-info" id="pagination-info">
+                        แสดงแถว 0 - 0 จากทั้งหมด 0 แถว
+                    </div>
+                    <div class="pagination-controls" id="pagination-controls">
+                        <!-- Dynamic page buttons -->
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <!-- 🔮 Footer -->
+        <footer>
+            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | Built with Premium Custom CSS and Javascript.
+        </footer>
+
+    </div>
+
+    <!-- --- Dependency Libraries --- -->
+    <!-- SheetJS to read Excel in the browser -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- ApexCharts for modern gorgeous visualisations -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Main Application Javascript Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

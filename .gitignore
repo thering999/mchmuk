@@ -1,0 +1,20 @@
+# OS & Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Data files (sensitive patient data - do NOT commit)
+tmp_exchange_data.xlsx
+*.xlsx
+*.xls
+*.csv
+
+# Log files
+*.log
+npm-debug.log*
+
+# Node (if ever used)
+node_modules/
