@@ -114,6 +114,38 @@
 </head>
 <body>
 
+    <!-- 🔐 Premium Cyber-Neon Login Overlay -->
+    <div class="login-overlay" id="login-overlay">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo-icon">
+                    <i data-lucide="shield-alert"></i>
+                </div>
+                <h2>MCHMUK Portal</h2>
+                <p>กรุณาเข้าสู่ระบบเพื่อเข้าใช้งานระบบวิเคราะห์ข้อมูล</p>
+            </div>
+            
+            <div class="login-error" id="login-error-msg">
+                <i data-lucide="alert-triangle"></i>
+                <span id="err-text">อีเมลหรือรหัสผ่านไม่ถูกต้อง</span>
+            </div>
+
+            <form class="login-form" id="login-form" onsubmit="return false;">
+                <div class="login-field">
+                    <label for="login-email">อีเมลผู้ใช้งาน (Email Address)</label>
+                    <input type="email" id="login-email" class="login-input" placeholder="name@moph.mail.go.th" required>
+                </div>
+                <div class="login-field">
+                    <label for="login-password">รหัสผ่าน (Password)</label>
+                    <input type="password" id="login-password" class="login-input" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn login-submit-btn" id="btn-submit-login">
+                    <i data-lucide="log-in"></i> เข้าสู่ระบบอย่างปลอดภัย
+                </button>
+            </form>
+        </div>
+    </div>
+
     <div class="app-container">
         
         <!-- 💎 Futuristic Header -->
@@ -124,12 +156,23 @@
                 </div>
                 <div class="logo-text">
                     <h1>MCHMUK Analytics</h1>
-                    <span>Holographic Dashboard System v1.1</span>
+                    <span>Holographic Dashboard System v1.2</span>
                 </div>
             </div>
-            <div class="header-actions">
-                <button class="btn btn-secondary" id="btn-load-local">
-                    <i data-lucide="database"></i> Load local Excel
+            <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
+                <!-- User Badge -->
+                <div class="user-profile-badge" id="user-badge" style="display: none;">
+                    <div class="user-avatar" id="user-avatar-char">U</div>
+                    <div class="user-details">
+                        <span class="user-name" id="val-user-name">User Account</span>
+                        <span class="user-role-badge" id="val-user-role">viewer</span>
+                    </div>
+                    <button class="btn-logout" id="btn-logout" title="ออกจากระบบ">
+                        <i data-lucide="log-out" style="width: 16px; height: 16px;"></i>
+                    </button>
+                </div>
+                <button class="btn btn-secondary" id="btn-load-local" style="display: none;">
+                    <i data-lucide="database"></i> Load Local Dev File
                 </button>
             </div>
         </header>
@@ -152,42 +195,66 @@
 
         <!-- 🚀 Upload & File Information Section -->
         <section class="upload-container">
-            <!-- Drag & Drop Dropzone -->
-            <div class="dropzone-card" id="dropzone">
-                <input type="file" id="file-input" class="file-input" accept=".xlsx, .xls, .csv">
-                <div class="dropzone-icon">
-                    <i data-lucide="upload-cloud"></i>
+            
+            <!-- Left Panel: Excel Drag & Drop (Admins Only) + DB Selector Card (All) -->
+            <div style="display: flex; flex-direction: column; gap: 20px;">
+                
+                <!-- Drag & Drop Dropzone (Only shown to Admin) -->
+                <div class="dropzone-card" id="dropzone" style="display: none;">
+                    <input type="file" id="file-input" class="file-input" accept=".xlsx, .xls, .csv">
+                    <div class="dropzone-icon">
+                        <i data-lucide="upload-cloud"></i>
+                    </div>
+                    <div class="dropzone-text">
+                        <h3>นำเข้าข้อมูลไฟล์ Excel / CSV เพื่อประมวลผลขึ้นระบบ</h3>
+                        <p>ลากไฟล์ Excel HDC มาวางที่นี่ หรือคลิกเพื่ออัปโหลดประมวลผลรายบุคคลเก็บเข้าระบบ</p>
+                    </div>
+                    <button class="btn">
+                        <i data-lucide="file-spreadsheet"></i> เลือกไฟล์ประมวลผล
+                    </button>
                 </div>
-                <div class="dropzone-text">
-                    <h3>นำเข้าข้อมูลไฟล์ Excel หรือ CSV</h3>
-                    <p>ลากไฟล์มาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์จากคอมพิวเตอร์ของคุณ</p>
+
+                <!-- Database Processed Batches Selector -->
+                <div class="db-selector-card" id="db-selector-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); padding-bottom: 8px;">
+                        <span style="font-size: 0.85rem; font-weight: bold; color: var(--neon-cyan); text-transform: uppercase; letter-spacing: 1px;">
+                            <i data-lucide="database" style="vertical-align: middle; margin-right: 4px; width: 16px; height: 16px;"></i> ชุดข้อมูลประมวลผลรายบุคคลในระบบ
+                        </span>
+                        <span class="batch-badge" id="val-db-total">0 ชุด</span>
+                    </div>
+                    <div class="batch-list" id="db-batch-list">
+                        <div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">
+                            กำลังโหลดรายการข้อมูล...
+                        </div>
+                    </div>
                 </div>
-                <button class="btn" onclick="document.getElementById('file-input').click()">
-                    <i data-lucide="file-spreadsheet"></i> เลือกไฟล์ Excel
-                </button>
+
             </div>
 
-            <!-- File Details Card -->
-            <div class="file-info-card">
-                <div class="info-row">
-                    <span class="info-label"><i data-lucide="file"></i> ชื่อไฟล์</span>
-                    <span class="info-value" id="val-filename">ไม่มีการโหลดไฟล์</span>
+            <!-- Right Panel: Currently Active Dataset Details -->
+            <div class="file-info-card" style="height: 100%;">
+                <div style="font-size: 0.85rem; font-weight: bold; color: var(--text-primary); text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border-light); padding-bottom: 8px;">
+                    <i data-lucide="file-text" style="vertical-align: middle; margin-right: 4px; width: 16px; height: 16px;"></i> ชุดข้อมูลที่เปิดทำงานอยู่ (Active Dataset)
                 </div>
                 <div class="info-row">
-                    <span class="info-label"><i data-lucide="database"></i> ขนาดไฟล์</span>
-                    <span class="info-value" id="val-filesize">-</span>
+                    <span class="info-label"><i data-lucide="file"></i> ชื่อชุดข้อมูล</span>
+                    <span class="info-value text-glow" id="val-filename" style="color: var(--neon-cyan);">ไม่มีการโหลดข้อมูล</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label"><i data-lucide="layers"></i> จำนวนแผ่นงาน (Sheet)</span>
+                    <span class="info-label"><i data-lucide="users"></i> จำนวนเด็กทั้งหมด</span>
+                    <span class="info-value" id="val-filesize">- ราย</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label"><i data-lucide="user-check"></i> ผู้บันทึกประมวลผล</span>
                     <span class="info-value" id="val-sheets">-</span>
                 </div>
                 <div class="info-row" id="row-import-time" style="display: none;">
-                    <span class="info-label"><i data-lucide="calendar"></i> นำเข้าล่าสุดเมื่อ</span>
-                    <span class="info-value text-glow" id="val-import-time" style="color: var(--neon-cyan); font-weight: bold;">-</span>
+                    <span class="info-label"><i data-lucide="calendar"></i> อัปเดตล่าสุดเมื่อ</span>
+                    <span class="info-value text-glow" id="val-import-time" style="color: var(--neon-purple); font-weight: bold;">-</span>
                 </div>
                 <div class="info-row">
-                    <span class="info-label"><i data-lucide="check-circle-2"></i> สถานะ</span>
-                    <span class="status-badge pending" id="val-status">พร้อมทำงาน</span>
+                    <span class="info-label"><i data-lucide="check-circle-2"></i> สถานะการเชื่อมต่อ</span>
+                    <span class="status-badge pending" id="val-status">รอเข้าสู่ระบบ</span>
                 </div>
             </div>
         </section>
@@ -433,6 +500,17 @@
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- --- Firebase Core and Modules --- -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    
+    <!-- MCHMUK Firebase Adapter Modules -->
+    <script src="firebase-config.js"></script>
+    <script src="auth.js"></script>
+    <script src="db.js"></script>
     
     <!-- Main Application Javascript Logic -->
     <script src="app.js"></script>

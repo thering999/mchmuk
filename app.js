@@ -46,7 +46,7 @@ let charts = {
 const neonColors = ['#00f2fe', '#9d4edd', '#ff007f', '#00ff87', '#ffb300', '#007eff', '#ff6b6b'];
 
 // ==========================================================================
-// 🚀 Initialization & Event Listeners
+// 🚀 Initialization, Authentication & Event Listeners
 // ==========================================================================
 window.addEventListener('DOMContentLoaded', () => {
     // Initialize Lucide Icons
@@ -75,9 +75,98 @@ window.addEventListener('DOMContentLoaded', () => {
     initMophAgeFilters();
     initMophHctFilters();
 
-    // Proactively try to load local excel if served
-    loadLocalExcelFile(true);
+    // Bind Firebase Auth UI components
+    document.getElementById('btn-submit-login').addEventListener('click', handleUserLogin);
+    document.getElementById('btn-logout').addEventListener('click', handleUserLogout);
+
+    // Initialize Firebase authentication listener
+    initAuth(onUserLoginSuccess, onUserLogoutSuccess);
 });
+
+// --- Firebase Authentication Callback: Sign In ---
+function onUserLoginSuccess(user, role, data) {
+    document.getElementById('login-overlay').style.display = 'none';
+    document.getElementById('user-badge').style.display = 'flex';
+    
+    const displayName = data?.displayName || user.email.split('@')[0];
+    document.getElementById('val-user-name').textContent = displayName;
+    document.getElementById('val-user-role').textContent = role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ดูข้อมูล (Viewer)';
+    document.getElementById('user-avatar-char').textContent = displayName[0].toUpperCase();
+
+    // Role-based capability: Admin sees the file dropzone, Viewer only selects existing databases!
+    const dropzone = document.getElementById('dropzone');
+    if (role === 'admin') {
+        dropzone.style.display = 'flex';
+    } else {
+        dropzone.style.display = 'none';
+    }
+
+    // Status Badge
+    const statusVal = document.getElementById('val-status');
+    statusVal.textContent = 'เชื่อมต่อระบบแล้ว';
+    statusVal.className = 'status-badge success';
+
+    showToast(`🔑 ยินดีต้อนรับคุณ <strong>${displayName}</strong> เข้าสู่ระบบ`, 'success', 3000);
+
+    // Load available datasets
+    refreshBatchList();
+    loadLatestActiveBatch();
+}
+
+// --- Firebase Authentication Callback: Sign Out ---
+function onUserLogoutSuccess() {
+    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('user-badge').style.display = 'none';
+    
+    const statusVal = document.getElementById('val-status');
+    statusVal.textContent = 'รอเข้าสู่ระบบ';
+    statusVal.className = 'status-badge pending';
+
+    // Clear dashboard view back to welcome state
+    document.getElementById('welcome-message').style.display = 'block';
+    document.getElementById('panel-dimensions').style.display = 'none';
+    document.getElementById('dashboard-content').style.display = 'none';
+
+    // Reset fields
+    appState.workbook = null;
+    appState.rawData = [];
+    appState.rawDataText = null;
+}
+
+// --- Login Form Handler ---
+async function handleUserLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) {
+        showToast('⚠️ กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วน', 'warn', 3000);
+        return;
+    }
+
+    toggleLoader(true, 'กำลังเข้าสู่ระบบอย่างปลอดภัย...');
+    const res = await login(email, password);
+    toggleLoader(false);
+
+    if (res.ok) {
+        // Success callback onUserLoginSuccess is automatically called by Firebase state change listener
+        document.getElementById('login-error-msg').style.display = 'none';
+    } else {
+        const errorMsg = document.getElementById('login-error-msg');
+        document.getElementById('err-text').textContent = res.error;
+        errorMsg.style.display = 'flex';
+        showToast(`❌ เข้าสู่ระบบไม่สำเร็จ: ${res.error}`, 'error', 4000);
+    }
+}
+
+// --- Logout Handler ---
+async function handleUserLogout() {
+    if (confirm('คุณต้องการออกจากระบบหรือไม่?')) {
+        toggleLoader(true, 'กำลังออกจากระบบ...');
+        await logout();
+        toggleLoader(false);
+        showToast('🚪 ออกจากระบบเรียบร้อยแล้ว', 'info', 3000);
+    }
+}
 
 // --- Setup Age Segment Tab Filters for MOPH Mode ---
 function initMophAgeFilters() {
@@ -288,6 +377,28 @@ function processFile(file) {
             sheetSelect.value = targetSheet;
 
             loadSheetData(targetSheet);
+
+            // If user is an Admin, offer to upload this parsed batch to the database instantly!
+            if (isAdmin()) {
+                setTimeout(async () => {
+                    const defaultName = file.name.replace(/\.[^/.]+$/, "");
+                    const name = prompt(
+                        `📂 คุณเปิดดูไฟล์สำเร็จในฐานะผู้ดูแลระบบ!\n\nคุณต้องการบันทึกประมวลผลข้อมูลส่วนบุคคลจำนวน ${appState.rawData.length.toLocaleString()} รายชุดนี้เข้าระบบฐานข้อมูลส่วนกลางสำหรับผู้ใช้ทุกคนด้วยหรือไม่?\n\nกรุณาตั้งชื่อชุดข้อมูลสำหรับแสดงในระบบ:`,
+                        defaultName
+                    );
+                    
+                    if (name !== null && name.trim() !== "") {
+                        toggleLoader(true, 'กำลังส่งข้อมูลเข้าสู่ฐานข้อมูลประมวลผลส่วนกลาง...');
+                        // Use appState.rawDataText to preserve exact raw strings in Firebase Storage
+                        const uploadRes = await dbUploadBatch(appState.rawDataText, file.name, name.trim());
+                        toggleLoader(false);
+                        
+                        if (uploadRes.ok) {
+                            refreshBatchList();
+                        }
+                    }
+                }, 800);
+            }
 
         } catch (err) {
             console.error(err);
@@ -1751,4 +1862,238 @@ function loadDemoData() {
 
     triggerAnalyticsUpdate();
     toggleLoader(false);
+}
+
+// ==========================================================================
+// 🗄️ Firebase Database UI & Loader Modules
+// ==========================================================================
+
+// Load and parse data downloaded from the database
+function loadDatabaseData(records, metadata) {
+    toggleLoader(true, `กำลังวิเคราะห์ข้อมูลชุด [${metadata.name}]...`);
+    appState.currentSheetName = metadata.name;
+    appState.workbook = null; // Clear spreadsheet reference since we are in DB mode
+
+    if (!records || records.length === 0) {
+        showToast('⚠️ ชุดข้อมูลนี้ไม่มีข้อมูล หรือรูปแบบไม่ถูกต้อง!', 'warn', 5000);
+        toggleLoader(false);
+        return;
+    }
+
+    // Tag each row and create parsed vs text version
+    const jsonData = JSON.parse(JSON.stringify(records));
+    const jsonDataText = JSON.parse(JSON.stringify(records));
+
+    jsonData.forEach((row, idx) => { row.__rowIdx__ = idx; });
+    appState.rawDataText = jsonDataText;
+
+    // Convert string representations of dates back to JS Date objects for calculation
+    const dateKeys = ['birth', 'epi_date', 'lab_date', 'birthday', 'date'];
+    jsonData.forEach(row => {
+        Object.keys(row).forEach(key => {
+            const val = row[key];
+            if (val === undefined || val === null || val === "") return;
+            
+            const lowerKey = key.toLowerCase();
+            
+            // Pad identifiers
+            if (lowerKey === 'hoscode' || lowerKey === 'hospcode' || lowerKey === 'hcode') {
+                const numericStr = String(val).trim();
+                if (!isNaN(numericStr) && numericStr.length > 0 && !numericStr.includes('.')) {
+                    row[key] = numericStr.padStart(5, '0');
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][key] = row[key];
+                    }
+                }
+            }
+            else if (lowerKey === 'nation') {
+                const numericStr = String(val).trim();
+                if (!isNaN(numericStr) && numericStr.length > 0 && !numericStr.includes('.')) {
+                    row[key] = numericStr.padStart(3, '0');
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][key] = row[key];
+                    }
+                }
+            }
+            else if (lowerKey === 'cid') {
+                const numericStr = String(val).trim();
+                if (!isNaN(numericStr) && numericStr.length > 0 && !numericStr.includes('.')) {
+                    row[key] = numericStr.padStart(13, '0');
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][key] = row[key];
+                    }
+                }
+            }
+            
+            // Check if this key or value resembles a date and parse it!
+            if (dateKeys.includes(lowerKey) || (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val))) {
+                const parsedDate = new Date(val);
+                if (!isNaN(parsedDate.getTime())) {
+                    row[key] = parsedDate;
+                }
+            }
+        });
+    });
+
+    appState.rawData = jsonData;
+
+    // Collect headers
+    const headerSet = new Set();
+    jsonData.forEach(row => {
+        Object.keys(row).forEach(key => {
+            if (key !== '__rowIdx__') headerSet.add(key);
+        });
+    });
+    appState.headers = Array.from(headerSet);
+
+    // Populate sheet select to show the database name
+    const sheetSelect = document.getElementById('select-sheet');
+    sheetSelect.innerHTML = '';
+    const opt = document.createElement('option');
+    opt.value = metadata.name;
+    opt.textContent = metadata.name;
+    sheetSelect.appendChild(opt);
+    sheetSelect.value = metadata.name;
+
+    // Detect Column Types & MOPH logic
+    analyzeColumnTypes();
+    detectMophIronDataset();
+    populateDimensionSelects();
+    applyAllFilters();
+
+    // UI visibility
+    document.getElementById('welcome-message').style.display = 'none';
+    document.getElementById('panel-dimensions').style.display = 'block';
+    document.getElementById('dashboard-content').style.display = 'flex';
+
+    // File info
+    document.getElementById('val-filename').textContent = metadata.name;
+    document.getElementById('val-filesize').textContent = `${metadata.recordCount.toLocaleString()} ราย`;
+    document.getElementById('val-sheets').textContent = metadata.uploadedByEmail || 'ระบบ';
+    
+    // Set import timestamp dynamically
+    const uploadedDate = metadata.uploadedAt ? metadata.uploadedAt.toDate() : new Date();
+    const formattedTime = uploadedDate.toLocaleDateString('th-TH', {
+        year: 'numeric', month: 'long', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+    }) + " น.";
+
+    const timeRow = document.getElementById('row-import-time');
+    const timeVal = document.getElementById('val-import-time');
+    if (timeRow && timeVal) {
+        timeRow.style.display = 'flex';
+        timeVal.textContent = formattedTime;
+    }
+
+    if (appState.isMophMode) {
+        document.getElementById('moph-mode-notice').innerHTML = `📌 โหลดจากฐานข้อมูลประมวลผลสำเร็จ ณ วันที่ <strong>${formattedTime}</strong>`;
+    }
+
+    triggerAnalyticsUpdate();
+    toggleLoader(false);
+    showToast(`✅ โหลดข้อมูลจากระบบสำเร็จ! พบ <strong>${jsonData.length.toLocaleString()} ราย</strong> ${appState.isMophMode ? '(โหมด MOPH HDC)' : ''}`, 'success', 5000);
+}
+
+// Refresh database batch datasets
+async function refreshBatchList() {
+    const listContainer = document.getElementById('db-batch-list');
+    if (!listContainer) return;
+    
+    listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">กำลังโหลดชุดข้อมูล...</div>`;
+    
+    const batches = await dbListBatches();
+    document.getElementById('val-db-total').textContent = `${batches.length} ชุด`;
+    
+    if (batches.length === 0) {
+        listContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); font-size: 0.8rem; padding: 20px 0;">📭 ยังไม่มีข้อมูลบันทึกในระบบ</div>`;
+        return;
+    }
+    
+    listContainer.innerHTML = '';
+    batches.forEach(b => {
+        const item = document.createElement('div');
+        item.className = 'batch-item';
+        if (appState.currentSheetName === b.name) {
+            item.classList.add('active');
+        }
+        
+        // Formatted Date
+        const uploadedDate = b.uploadedAt ? b.uploadedAt.toDate() : new Date();
+        const dateStr = uploadedDate.toLocaleDateString('th-TH', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        
+        item.innerHTML = `
+            <div class="batch-meta-info" style="flex:1;">
+                <span class="batch-title">${b.name}</span>
+                <span class="batch-subtext" style="display:block;"><i data-lucide="users" style="width:10px;height:10px;vertical-align:middle;margin-right:2px;"></i> ${b.recordCount.toLocaleString()} ราย | <i data-lucide="clock" style="width:10px;height:10px;vertical-align:middle;margin-right:2px;"></i> ${dateStr}</span>
+            </div>
+            <div class="batch-actions" style="display:flex; gap:6px;">
+                ${isAdmin() ? `<button class="btn btn-secondary btn-delete-batch" style="padding: 4px 8px; font-size: 0.75rem; border-color: var(--neon-pink); color: var(--neon-pink);" data-id="${b.id}" title="ลบชุดข้อมูล"><i data-lucide="trash-2" style="width:12px;height:12px;"></i></button>` : ''}
+                <button class="btn btn-load-batch" style="padding: 4px 10px; font-size: 0.75rem;" data-id="${b.id}"><i data-lucide="folder-open" style="width:12px;height:12px;"></i> เปิด</button>
+            </div>
+        `;
+        
+        // Event binding
+        item.querySelector('.btn-load-batch').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            toggleLoader(true, 'กำลังโหลดชุดข้อมูล...');
+            const res = await dbDownloadBatch(b.id);
+            if (res.ok) {
+                loadDatabaseData(res.records, res.metadata);
+                // Highlight active item
+                document.querySelectorAll('.batch-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+            } else {
+                toggleLoader(false);
+            }
+        });
+        
+        if (isAdmin()) {
+            item.querySelector('.btn-delete-batch').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (confirm(`คุณแน่ใจหรือไม่ที่จะลบชุดข้อมูล "${b.name}"?\n(ข้อมูลส่วนบุคคลรายตัวของรอบนี้จะถูกลบออกจากฐานข้อมูลด้วย)`)) {
+                    toggleLoader(true, 'กำลังลบชุดข้อมูล...');
+                    const res = await dbDeleteBatch(b.id);
+                    if (res.ok) {
+                        showToast('ลบชุดข้อมูลสำเร็จ', 'success', 3000);
+                        refreshBatchList();
+                        
+                        // Clear active view if it was deleted
+                        if (appState.currentSheetName === b.name) {
+                            appState.rawData = [];
+                            appState.rawDataText = null;
+                            document.getElementById('welcome-message').style.display = 'block';
+                            document.getElementById('panel-dimensions').style.display = 'none';
+                            document.getElementById('dashboard-content').style.display = 'none';
+                            document.getElementById('val-filename').textContent = "ไม่มีการโหลดข้อมูล";
+                        }
+                    } else {
+                        showToast(`ลบไม่สำเร็จ: ${res.error}`, 'error', 5000);
+                    }
+                    toggleLoader(false);
+                }
+            });
+        }
+        
+        listContainer.appendChild(item);
+    });
+    
+    lucide.createIcons();
+}
+
+// Auto loader for active batch
+async function loadLatestActiveBatch() {
+    const activeBatch = await dbGetActiveBatch();
+    if (activeBatch) {
+        toggleLoader(true, 'กำลังโหลดข้อมูลชุดล่าสุด...');
+        const res = await dbDownloadBatch(activeBatch.id);
+        if (res.ok) {
+            loadDatabaseData(res.records, res.metadata);
+            refreshBatchList();
+        } else {
+            toggleLoader(false);
+        }
+    } else {
+        // Fallback: If no database batch found, try loading the local file for development
+        loadLocalExcelFile(true);
+    }
 }
