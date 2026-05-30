@@ -110,6 +110,55 @@
             color: var(--neon-cyan);
             box-shadow: 0 0 10px var(--neon-cyan-glow);
         }
+        
+        /* PDPA Lock Overlay */
+        .pdpa-lock-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 15, 30, 0.88);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            border-radius: 16px;
+            border: 1px dashed var(--neon-pink);
+            box-shadow: 0 0 30px rgba(255, 0, 127, 0.1) inset;
+        }
+        .pdpa-lock-content {
+            text-align: center;
+            padding: 30px;
+            max-width: 450px;
+        }
+        .pdpa-lock-icon {
+            width: 48px;
+            height: 48px;
+            color: var(--neon-pink);
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+        .pdpa-lock-content h3 {
+            color: #fff;
+            font-size: 1.25rem;
+            margin-bottom: 8px;
+            font-family: var(--font-display);
+            letter-spacing: 1px;
+        }
+        .pdpa-lock-content p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+        .pdpa-unlock-btn {
+            background: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-purple) 100%) !important;
+            border-color: var(--neon-pink) !important;
+            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4) !important;
+        }
     </style>
 </head>
 <body>
@@ -201,6 +250,10 @@
                         <i data-lucide="log-out" style="width: 16px; height: 16px;"></i>
                     </button>
                 </div>
+                <!-- Guest Mode Login Button -->
+                <button class="btn" id="btn-header-login" style="background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);">
+                    <i data-lucide="log-in"></i> เข้าสู่ระบบ (Sign In)
+                </button>
                 <button class="btn btn-secondary" id="btn-load-local" style="display: none;">
                     <i data-lucide="database"></i> Load Local Dev File
                 </button>
@@ -451,7 +504,21 @@
             </section>
 
             <!-- Interactive Cyber-Grid Table -->
-            <section class="table-card">
+            <section class="table-card" style="position: relative;">
+                <!-- PDPA Lock Screen Overlay -->
+                <div class="pdpa-lock-overlay" id="pdpa-lock-overlay" style="display: none;">
+                    <div class="pdpa-lock-content">
+                        <div class="pdpa-lock-icon">
+                            <i data-lucide="shield-alert" style="width: 48px; height: 48px;"></i>
+                        </div>
+                        <h3>🔒 ปิดบังข้อมูลส่วนบุคคลตามกฎหมาย PDPA</h3>
+                        <p>กรุณาเข้าสู่ระบบด้วยบัญชีผู้ใช้เพื่อเปิดดูตารางรายละเอียดรายบุคคลและส่งออกข้อมูล (Export)</p>
+                        <button class="btn pdpa-unlock-btn" id="btn-pdpa-unlock">
+                            <i data-lucide="key-round"></i> เข้าสู่ระบบเพื่อปลดล็อกข้อมูล
+                        </button>
+                    </div>
+                </div>
+
                 <div class="chart-header" style="margin-bottom: 5px;">
                     <span class="chart-title"><i data-lucide="table"></i> ตารางวิเคราะห์และค้นหาข้อมูลอย่างง่าย (Dynamic Grid)</span>
                 </div>

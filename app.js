@@ -123,14 +123,37 @@ window.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Initialize Firebase authentication listener
+    // Bind Guest Mode Login Triggers
+    const btnHeaderLogin = document.getElementById('btn-header-login');
+    if (btnHeaderLogin) {
+        btnHeaderLogin.addEventListener('click', () => {
+            document.getElementById('login-overlay').style.display = 'flex';
+        });
+    }
+
+    const btnPdpaUnlock = document.getElementById('btn-pdpa-unlock');
+    if (btnPdpaUnlock) {
+        btnPdpaUnlock.addEventListener('click', () => {
+            document.getElementById('login-overlay').style.display = 'flex';
+        });
+    }
+
+    // Initialize authentication listener
     initAuth(onUserLoginSuccess, onUserLogoutSuccess);
 });
 
-// --- Firebase Authentication Callback: Sign In ---
+// --- Authentication Callback: Sign In ---
 function onUserLoginSuccess(user, role, data) {
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('user-badge').style.display = 'flex';
+    document.getElementById('btn-header-login').style.display = 'none';
+    
+    // Hide PDPA Lock Overlay when logged in!
+    document.getElementById('pdpa-lock-overlay').style.display = 'none';
+    
+    // Enable export actions
+    document.getElementById('btn-export-csv').style.display = 'inline-flex';
+    document.getElementById('btn-export-json').style.display = 'inline-flex';
     
     const displayName = data?.displayName || user.email.split('@')[0];
     document.getElementById('val-user-name').textContent = displayName;
@@ -147,33 +170,39 @@ function onUserLoginSuccess(user, role, data) {
 
     // Status Badge
     const statusVal = document.getElementById('val-status');
-    statusVal.textContent = 'เชื่อมต่อระบบแล้ว';
+    statusVal.textContent = role === 'admin' ? 'โหมดผู้ดูแลระบบ' : 'โหมดเจ้าหน้าที่';
     statusVal.className = 'status-badge success';
 
     showToast(`🔑 ยินดีต้อนรับคุณ <strong>${displayName}</strong> เข้าสู่ระบบ`, 'success', 3000);
 
-    // Auto load the local standard Excel dataset (tmp_exchange_data.xlsx) upon login!
+    // Load active persistent excel dataset
     loadLocalExcelFile(true);
 }
 
-// --- Firebase Authentication Callback: Sign Out ---
+// --- Authentication Callback: Sign Out / Guest Mode ---
 function onUserLogoutSuccess() {
-    document.getElementById('login-overlay').style.display = 'flex';
+    document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('user-badge').style.display = 'none';
+    document.getElementById('btn-header-login').style.display = 'block';
+    
+    // Lock personal details behind PDPA Overlay in Guest mode!
+    document.getElementById('pdpa-lock-overlay').style.display = 'flex';
+    
+    // Hide export actions for guest
+    document.getElementById('btn-export-csv').style.display = 'none';
+    document.getElementById('btn-export-json').style.display = 'none';
+    
+    const dropzone = document.getElementById('dropzone');
+    if (dropzone) dropzone.style.display = 'none';
     
     const statusVal = document.getElementById('val-status');
-    statusVal.textContent = 'รอเข้าสู่ระบบ';
-    statusVal.className = 'status-badge pending';
+    if (statusVal) {
+        statusVal.textContent = 'โหมดทั่วไป (PDPA)';
+        statusVal.className = 'status-badge pending';
+    }
 
-    // Clear dashboard view back to welcome state
-    document.getElementById('welcome-message').style.display = 'block';
-    document.getElementById('panel-dimensions').style.display = 'none';
-    document.getElementById('dashboard-content').style.display = 'none';
-
-    // Reset fields
-    appState.workbook = null;
-    appState.rawData = [];
-    appState.rawDataText = null;
+    // Auto load current excel dataset for Guest to view high-level summaries
+    loadLocalExcelFile(true);
 }
 
 // --- Login Form Handler ---
