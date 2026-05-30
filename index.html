@@ -140,12 +140,12 @@
             <div id="login-form-container">
                 <form class="login-form" id="login-form" onsubmit="return false;">
                     <div class="login-field">
-                        <label for="login-email">อีเมลผู้ใช้งาน (Email Address)</label>
-                        <input type="email" id="login-email" class="login-input" placeholder="name@moph.mail.go.th" required>
+                        <label for="login-email">ชื่อผู้ใช้งาน (Username)</label>
+                        <input type="text" id="login-email" class="login-input" placeholder="ระบุ admin หรือ viewer" required autocomplete="username">
                     </div>
                     <div class="login-field">
                         <label for="login-password">รหัสผ่าน (Password)</label>
-                        <input type="password" id="login-password" class="login-input" placeholder="••••••••" required>
+                        <input type="password" id="login-password" class="login-input" placeholder="••••••••" required autocomplete="current-password">
                     </div>
                     <button type="submit" class="btn login-submit-btn" id="btn-submit-login">
                         <i data-lucide="log-in"></i> เข้าสู่ระบบอย่างปลอดภัย
@@ -157,12 +157,12 @@
             <div id="register-form-container" style="display: none;">
                 <form class="login-form" id="register-form" onsubmit="return false;">
                     <div class="login-field">
-                        <label for="register-name">ชื่อ-นามสกุล หรือชื่อแสดงตัวตน</label>
+                        <label for="register-name">ชื่อแสดงตัวตน (Display Name)</label>
                         <input type="text" id="register-name" class="login-input" placeholder="สมชาย ใจดี" required>
                     </div>
                     <div class="login-field">
-                        <label for="register-email">อีเมลผู้ใช้งาน (Email Address)</label>
-                        <input type="email" id="register-email" class="login-input" placeholder="name@moph.mail.go.th" required>
+                        <label for="register-email">ชื่อผู้ใช้งานที่ต้องการ (Username)</label>
+                        <input type="text" id="register-email" class="login-input" placeholder="ระบุชื่อผู้ใช้ใหม่" required>
                     </div>
                     <div class="login-field">
                         <label for="register-password">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>

@@ -118,28 +118,30 @@ async function login(usernameOrEmail, password) {
     return { ok: false, error: 'ระบุผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง' };
 }
 
-async function registerUser(email, password, displayName) {
+async function registerUser(username, password, displayName) {
     // Since we are client-side only, we dynamically insert into STATIC_USERS!
     await new Promise(r => setTimeout(r, 500));
     
-    const key = email.toLowerCase().trim();
+    const key = username.toLowerCase().trim();
     if (STATIC_USERS[key]) {
-        return { ok: false, error: 'อีเมลนี้มีผู้ใช้งานในระบบอยู่แล้ว' };
+        return { ok: false, error: 'ชื่อผู้ใช้งานนี้มีในระบบอยู่แล้ว' };
     }
 
+    const email = key.includes('@') ? key : `${key}@mchmuk.com`;
+
     const newProfile = {
-        username: key.split('@')[0],
+        username: key,
         email: email,
-        displayName: displayName || key.split('@')[0],
+        displayName: displayName || key,
         role: 'viewer', // registered users are always viewers by default
         password: password
     };
 
     STATIC_USERS[key] = newProfile;
-    STATIC_USERS[newProfile.username] = newProfile;
+    STATIC_USERS[email] = newProfile;
 
     // Log them in immediately!
-    return login(email, password);
+    return login(key, password);
 }
 
 async function logout() {
