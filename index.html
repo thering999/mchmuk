@@ -420,6 +420,16 @@
                 </button>
             </div>
 
+            <!-- Quick Hospital/Unit Filter (Visible only in MOPH mode) -->
+            <div class="filter-tabs" id="moph-hospital-filter" style="display: none; margin-top: 8px; align-items: center; gap: 12px; padding: 12px; background: rgba(30, 41, 59, 0.5); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+                <span style="color: var(--neon-cyan); font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
+                    <i data-lucide="building-2" style="width: 18px; height: 18px;"></i> กรองหน่วยบริการ (HOSCODE):
+                </span>
+                <select id="select-hospital" class="form-select" style="max-width: 400px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--neon-cyan); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(0, 242, 254, 0.15); font-family: var(--font-main);">
+                    <option value="all">🏥 ทุกหน่วยบริการ (ทั้งหมด)</option>
+                </select>
+            </div>
+
             <!-- Key Metrics Cards -->
             <section class="metrics-grid">
                 <!-- KPI 1 -->
@@ -560,7 +570,7 @@
         </div>
 
         <footer>
-            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.2.8 | Built with Premium Custom CSS and Javascript.
+            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.2.9 | Built with Premium Custom CSS and Javascript.
         </footer>
 
     </div>
@@ -574,9 +584,9 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     
     <!-- MCHMUK Local Authenticator Module -->
-    <script src="auth.js?v=1.2.8"></script>
+    <script src="auth.js?v=1.2.9"></script>
     
     <!-- Main Application Javascript Logic -->
-    <script src="app.js?v=1.2.8"></script>
+    <script src="app.js?v=1.2.9"></script>
 </body>
 </html>

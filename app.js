@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.2.8 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.2.9 Loaded Successfully");
 
 // --- Global Application State ---
 let appState = {
@@ -32,7 +32,8 @@ let appState = {
     // Specialized MOPH Mode State
     isMophMode: false,
     activeAgeFilter: "all", // all, 6-12, 36-60
-    activeHctFilter: "all"  // all, not-tested, tested, anemia, normal
+    activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
+    activeHospitalFilter: "all"
 };
 
 // --- ApexCharts Global Instances ---
@@ -75,6 +76,16 @@ window.addEventListener('DOMContentLoaded', () => {
     // Bind Age Tabs for MOPH Mode
     initMophAgeFilters();
     initMophHctFilters();
+
+    // Bind Hospital select filter
+    const selectHospital = document.getElementById('select-hospital');
+    if (selectHospital) {
+        selectHospital.addEventListener('change', (e) => {
+            appState.activeHospitalFilter = e.target.value;
+            applyAllFilters();
+            triggerAnalyticsUpdate();
+        });
+    }
 
     // Bind Firebase Auth UI components
     document.getElementById('btn-submit-login').addEventListener('click', handleUserLogin);
@@ -710,13 +721,77 @@ function detectMophIronDataset() {
         document.getElementById('moph-banner').style.display = 'flex';
         document.getElementById('moph-age-filters').style.display = 'flex';
         document.getElementById('moph-hct-filters').style.display = 'flex';
+        
+        const mophHospitalFilter = document.getElementById('moph-hospital-filter');
+        if (mophHospitalFilter) {
+            mophHospitalFilter.style.display = 'flex';
+            populateHospitalSelect();
+        }
+        
         document.getElementById('moph-mode-notice').textContent = "📌 วิเคราะห์ในโหมดผู้รับธาตุเหล็ก (MOPH HDC Mode)";
     } else {
         appState.isMophMode = false;
         document.getElementById('moph-banner').style.display = 'none';
         document.getElementById('moph-age-filters').style.display = 'none';
         document.getElementById('moph-hct-filters').style.display = 'none';
+        
+        const mophHospitalFilter = document.getElementById('moph-hospital-filter');
+        if (mophHospitalFilter) {
+            mophHospitalFilter.style.display = 'none';
+        }
+        
         document.getElementById('moph-mode-notice').textContent = "";
+    }
+}
+
+// Dynamically compile and populate hospital select options
+function populateHospitalSelect() {
+    const select = document.getElementById('select-hospital');
+    if (!select) return;
+
+    // Reset select options
+    select.innerHTML = '<option value="all">🏥 ทุกหน่วยบริการ (ทั้งหมด)</option>';
+
+    // Find the hospital code and hospital name columns
+    const hoscodeCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'hoscode' || l === 'hospcode' || l === 'hcode';
+    });
+    const hosnameCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'hosname' || l === 'hname' || l === 'hospital';
+    });
+
+    if (!hoscodeCol || !hosnameCol) return;
+
+    // Scan all rows to collect unique (code, name) pairs
+    const hospitalMap = new Map();
+    appState.rawData.forEach(row => {
+        const code = String(row[hoscodeCol] || '').trim();
+        const name = String(row[hosnameCol] || '').trim();
+        if (code && name) {
+            hospitalMap.set(code, name);
+        }
+    });
+
+    // Sort by code
+    const sortedCodes = Array.from(hospitalMap.keys()).sort();
+
+    // Populate options
+    sortedCodes.forEach(code => {
+        const name = hospitalMap.get(code);
+        const opt = document.createElement('option');
+        opt.value = code;
+        opt.textContent = `[${code}] - ${name}`;
+        select.appendChild(opt);
+    });
+    
+    // Set active filter to whatever was selected (or 'all' if default)
+    if (appState.activeHospitalFilter) {
+        select.value = appState.activeHospitalFilter;
+    } else {
+        appState.activeHospitalFilter = 'all';
+        select.value = 'all';
     }
 }
 
@@ -828,6 +903,20 @@ function applyAllFilters() {
             }
             return true;
         });
+    }
+
+    // 1.8 Apply Specialized Hospital/Unit Filter if active
+    if (appState.isMophMode && appState.activeHospitalFilter && appState.activeHospitalFilter !== 'all') {
+        const hoscodeCol = appState.headers.find(h => {
+            const l = h.toLowerCase();
+            return l === 'hoscode' || l === 'hospcode' || l === 'hcode';
+        });
+        if (hoscodeCol) {
+            filtered = filtered.filter(row => {
+                const val = String(row[hoscodeCol] || '').trim();
+                return val === appState.activeHospitalFilter;
+            });
+        }
     }
 
     // 2. Apply Fuzzy Search Query Filter
