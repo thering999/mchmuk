@@ -63,6 +63,40 @@ async function sendPasswordReset(email) {
     }
 }
 
+async function registerUser(email, password, displayName) {
+    try {
+        const result = await fbAuth.createUserWithEmailAndPassword(email, password);
+        const newUid = result.user.uid;
+
+        // Check if this is the first user in the system to automatically grant Admin role!
+        const usersSnap = await fbDb.collection('users').limit(1).get().catch(() => ({ empty: true }));
+        const role = usersSnap.empty ? 'admin' : 'viewer';
+
+        await fbDb.collection('users').doc(newUid).set({
+            email,
+            displayName: displayName || email.split('@')[0],
+            role: role,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Set the current user's profile display name
+        if (result.user) {
+            await result.user.updateProfile({
+                displayName: displayName || email.split('@')[0]
+            }).catch(() => {});
+        }
+
+        return { ok: true, role };
+    } catch (err) {
+        const msg = {
+            'auth/email-already-in-use': 'อีเมลนี้มีผู้ใช้งานแล้ว',
+            'auth/weak-password': 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร',
+            'auth/invalid-email': 'รูปแบบอีเมลไม่ถูกต้อง'
+        };
+        return { ok: false, error: msg[err.code] || err.message };
+    }
+}
+
 // ── Admin: User Management ────────────────────────────────────────────────────
 async function adminCreateUser(email, password, displayName, role, hosCode = '') {
     if (currentUserRole !== 'admin') return { ok: false, error: 'ไม่มีสิทธิ์' };

@@ -77,7 +77,51 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Bind Firebase Auth UI components
     document.getElementById('btn-submit-login').addEventListener('click', handleUserLogin);
+    document.getElementById('btn-submit-register').addEventListener('click', handleUserRegister);
     document.getElementById('btn-logout').addEventListener('click', handleUserLogout);
+
+    // Bind Login/Register Tab Toggles
+    const tabLoginBtn = document.getElementById('tab-login-btn');
+    const tabRegisterBtn = document.getElementById('tab-register-btn');
+    const loginFormContainer = document.getElementById('login-form-container');
+    const registerFormContainer = document.getElementById('register-form-container');
+    const loginHeaderDesc = document.getElementById('login-header-desc');
+
+    if (tabLoginBtn && tabRegisterBtn) {
+        tabLoginBtn.addEventListener('click', () => {
+            tabLoginBtn.classList.add('active');
+            tabLoginBtn.style.color = 'var(--neon-cyan)';
+            tabLoginBtn.style.borderBottom = '2px solid var(--neon-cyan)';
+            tabLoginBtn.style.fontWeight = 'bold';
+
+            tabRegisterBtn.classList.remove('active');
+            tabRegisterBtn.style.color = 'var(--text-muted)';
+            tabRegisterBtn.style.borderBottom = '2px solid transparent';
+            tabRegisterBtn.style.fontWeight = 'normal';
+
+            loginFormContainer.style.display = 'block';
+            registerFormContainer.style.display = 'none';
+            loginHeaderDesc.textContent = 'กรุณาเข้าสู่ระบบเพื่อเข้าใช้งานระบบวิเคราะห์ข้อมูล';
+            document.getElementById('login-error-msg').style.display = 'none';
+        });
+
+        tabRegisterBtn.addEventListener('click', () => {
+            tabRegisterBtn.classList.add('active');
+            tabRegisterBtn.style.color = 'var(--neon-purple)';
+            tabRegisterBtn.style.borderBottom = '2px solid var(--neon-purple)';
+            tabRegisterBtn.style.fontWeight = 'bold';
+
+            tabLoginBtn.classList.remove('active');
+            tabLoginBtn.style.color = 'var(--text-muted)';
+            tabLoginBtn.style.borderBottom = '2px solid transparent';
+            tabLoginBtn.style.fontWeight = 'normal';
+
+            loginFormContainer.style.display = 'none';
+            registerFormContainer.style.display = 'block';
+            loginHeaderDesc.textContent = 'กรอกข้อมูลด้านล่างเพื่อสร้างบัญชีผู้ใช้งานใหม่ของคุณ';
+            document.getElementById('login-error-msg').style.display = 'none';
+        });
+    }
 
     // Initialize Firebase authentication listener
     initAuth(onUserLoginSuccess, onUserLogoutSuccess);
@@ -155,6 +199,42 @@ async function handleUserLogin() {
         document.getElementById('err-text').textContent = res.error;
         errorMsg.style.display = 'flex';
         showToast(`❌ เข้าสู่ระบบไม่สำเร็จ: ${res.error}`, 'error', 4000);
+    }
+}
+
+// --- Register Form Handler ---
+async function handleUserRegister() {
+    const name = document.getElementById('register-name').value.trim();
+    const email = document.getElementById('register-email').value.trim();
+    const password = document.getElementById('register-password').value;
+
+    if (!name || !email || !password) {
+        showToast('⚠️ กรุณากรอกข้อมูลสมัครสมาชิกให้ครบถ้วนทุกช่อง', 'warn', 3000);
+        return;
+    }
+
+    if (password.length < 6) {
+        showToast('⚠️ รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร', 'warn', 3000);
+        return;
+    }
+
+    toggleLoader(true, 'กำลังสร้างบัญชีผู้ใช้งานใหม่ของคุณ...');
+    const res = await registerUser(email, password, name);
+    toggleLoader(false);
+
+    if (res.ok) {
+        document.getElementById('login-error-msg').style.display = 'none';
+        showToast(`🎉 สมัครสมาชิกและเข้าสู่ระบบสำเร็จ! บทบาทของคุณคือ: ${res.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ดูข้อมูล (Viewer)'}`, 'success', 6000);
+        
+        // Clear registration fields
+        document.getElementById('register-name').value = '';
+        document.getElementById('register-email').value = '';
+        document.getElementById('register-password').value = '';
+    } else {
+        const errorMsg = document.getElementById('login-error-msg');
+        document.getElementById('err-text').textContent = res.error;
+        errorMsg.style.display = 'flex';
+        showToast(`❌ สมัครสมาชิกไม่สำเร็จ: ${res.error}`, 'error', 4000);
     }
 }
 

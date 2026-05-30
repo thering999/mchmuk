@@ -122,7 +122,13 @@
                     <i data-lucide="shield-alert"></i>
                 </div>
                 <h2>MCHMUK Portal</h2>
-                <p>กรุณาเข้าสู่ระบบเพื่อเข้าใช้งานระบบวิเคราะห์ข้อมูล</p>
+                <p id="login-header-desc">กรุณาเข้าสู่ระบบเพื่อเข้าใช้งานระบบวิเคราะห์ข้อมูล</p>
+            </div>
+
+            <!-- Tabs Toggle -->
+            <div class="login-tabs" style="display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+                <button class="login-tab-btn active" id="tab-login-btn" style="flex: 1; background: transparent; border: none; color: var(--neon-cyan); font-weight: bold; cursor: pointer; font-size: 0.95rem; text-align: center; padding: 6px 0; transition: all 0.3s; border-bottom: 2px solid var(--neon-cyan);">เข้าสู่ระบบ</button>
+                <button class="login-tab-btn" id="tab-register-btn" style="flex: 1; background: transparent; border: none; color: var(--text-muted); font-weight: normal; cursor: pointer; font-size: 0.95rem; text-align: center; padding: 6px 0; transition: all 0.3s; border-bottom: 2px solid transparent;">สมัครใช้งานใหม่</button>
             </div>
             
             <div class="login-error" id="login-error-msg">
@@ -130,19 +136,43 @@
                 <span id="err-text">อีเมลหรือรหัสผ่านไม่ถูกต้อง</span>
             </div>
 
-            <form class="login-form" id="login-form" onsubmit="return false;">
-                <div class="login-field">
-                    <label for="login-email">อีเมลผู้ใช้งาน (Email Address)</label>
-                    <input type="email" id="login-email" class="login-input" placeholder="name@moph.mail.go.th" required>
-                </div>
-                <div class="login-field">
-                    <label for="login-password">รหัสผ่าน (Password)</label>
-                    <input type="password" id="login-password" class="login-input" placeholder="••••••••" required>
-                </div>
-                <button type="submit" class="btn login-submit-btn" id="btn-submit-login">
-                    <i data-lucide="log-in"></i> เข้าสู่ระบบอย่างปลอดภัย
-                </button>
-            </form>
+            <!-- Login Container Form -->
+            <div id="login-form-container">
+                <form class="login-form" id="login-form" onsubmit="return false;">
+                    <div class="login-field">
+                        <label for="login-email">อีเมลผู้ใช้งาน (Email Address)</label>
+                        <input type="email" id="login-email" class="login-input" placeholder="name@moph.mail.go.th" required>
+                    </div>
+                    <div class="login-field">
+                        <label for="login-password">รหัสผ่าน (Password)</label>
+                        <input type="password" id="login-password" class="login-input" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn login-submit-btn" id="btn-submit-login">
+                        <i data-lucide="log-in"></i> เข้าสู่ระบบอย่างปลอดภัย
+                    </button>
+                </form>
+            </div>
+
+            <!-- Register Container Form (Initially Hidden) -->
+            <div id="register-form-container" style="display: none;">
+                <form class="login-form" id="register-form" onsubmit="return false;">
+                    <div class="login-field">
+                        <label for="register-name">ชื่อ-นามสกุล หรือชื่อแสดงตัวตน</label>
+                        <input type="text" id="register-name" class="login-input" placeholder="สมชาย ใจดี" required>
+                    </div>
+                    <div class="login-field">
+                        <label for="register-email">อีเมลผู้ใช้งาน (Email Address)</label>
+                        <input type="email" id="register-email" class="login-input" placeholder="name@moph.mail.go.th" required>
+                    </div>
+                    <div class="login-field">
+                        <label for="register-password">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
+                        <input type="password" id="register-password" class="login-input" placeholder="••••••••" required>
+                    </div>
+                    <button type="submit" class="btn login-submit-btn" id="btn-submit-register" style="background: linear-gradient(135deg, var(--neon-purple) 0%, var(--neon-pink) 100%); border-color: var(--neon-purple); box-shadow: 0 0 15px rgba(157, 78, 221, 0.4);">
+                        <i data-lucide="user-plus"></i> สมัครสมาชิกเข้าระบบ
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 
