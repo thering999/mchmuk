@@ -1465,46 +1465,91 @@ function renderPaginationControls(totalPages) {
 // ⬇️ Data Exporter System
 // ==========================================================================
 
+/**
+ * Serialize a cell value for export — preserves original format:
+ * - Date objects → YYYY-MM-DD (ISO format, คงรูปแบบต้นฉบับ ไม่มี "Wed May...")
+ * - Large numbers (cid/didstd) → plain string ไม่มี scientific notation
+ * - String/number → คงเดิม
+ */
+function serializeValueForExport(val, header) {
+    if (val === undefined || val === null || val === '') return '';
+
+    // 1. Date object → YYYY-MM-DD
+    if (val instanceof Date && !isNaN(val.getTime())) {
+        const y = val.getFullYear();
+        const m = String(val.getMonth() + 1).padStart(2, '0');
+        const d = String(val.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    // 2. Large numbers (cid, didstd, etc.) that JS converts to scientific notation
+    if (typeof val === 'number') {
+        // ถ้า number ใหญ่เกิน safe integer ให้ใช้ toFixed(0) ป้องกัน 1E+23
+        if (Math.abs(val) >= 1e15 || (Math.abs(val) < 1e-6 && val !== 0)) {
+            return val.toFixed(0);
+        }
+        return String(val);
+    }
+
+    return String(val);
+}
+
 function exportCSV() {
     if (appState.filteredData.length === 0) return;
 
     const csvRows = [];
-    csvRows.push(appState.headers.join(','));
+    // Header row
+    csvRows.push(appState.headers.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','));
 
     appState.filteredData.forEach(row => {
         const values = appState.headers.map(header => {
             const val = row[header];
-            // Standard RFC 4180 CSV escaping: double quotes are escaped with double quotes!
-            const escaped = String(val === undefined || val === null ? '' : val).replace(/"/g, '""');
+            const serialized = serializeValueForExport(val, header);
+            // RFC 4180 escaping
+            const escaped = serialized.replace(/"/g, '""');
             return `"${escaped}"`;
         });
         csvRows.push(values.join(','));
     });
 
-    // Prepend UTF-8 BOM (\ufeff) to force Excel on Windows to decode Thai characters correctly!
+    // Prepend UTF-8 BOM (\ufeff) เพื่อให้ Excel อ่านภาษาไทยได้ถูกต้อง
     const BOM = "\ufeff";
     const blob = new Blob([BOM + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `mchmuk_export_${appState.currentSheetName}.csv`);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `mchmuk_export_${appState.currentSheetName}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`📥 Export CSV สำเร็จ! ${appState.filteredData.length.toLocaleString()} แถว`, 'success', 4000);
 }
 
 function exportJSON() {
     if (appState.filteredData.length === 0) return;
 
-    const jsonStr = JSON.stringify(appState.filteredData, null, 2);
+    // Serialize ทุก field ให้ถูกต้องก่อน export
+    const cleanData = appState.filteredData.map(row => {
+        const cleanRow = {};
+        appState.headers.forEach(header => {
+            const val = row[header];
+            cleanRow[header] = serializeValueForExport(val, header);
+        });
+        return cleanRow;
+    });
+
+    const jsonStr = JSON.stringify(cleanData, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `mchmuk_export_${appState.currentSheetName}.json`);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `mchmuk_export_${appState.currentSheetName}.json`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast(`📥 Export JSON สำเร็จ! ${appState.filteredData.length.toLocaleString()} แถว`, 'success', 4000);
 }
 
 // ==========================================================================
