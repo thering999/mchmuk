@@ -426,7 +426,8 @@ function processFile(file) {
     const reader = new FileReader();
     reader.onload = function (e) {
         try {
-            const data = new Uint8Array(e.target.result);
+            const arrayBuffer = e.target.result;
+            const data = new Uint8Array(arrayBuffer);
             const workbook = XLSX.read(data, {
                 type: 'array',
                 cellDates: true,
@@ -456,6 +457,22 @@ function processFile(file) {
             sheetSelect.value = targetSheet;
 
             loadSheetData(targetSheet);
+
+            // Persist the uploaded Excel file in IndexedDB immediately!
+            const now = new Date().toISOString();
+            saveActiveDataset(arrayBuffer, file.name, file.size, now).then(() => {
+                const formattedTime = new Date(now).toLocaleDateString('th-TH', {
+                    year: 'numeric', month: 'long', day: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }) + " น.";
+
+                const timeRow = document.getElementById('row-import-time');
+                const timeVal = document.getElementById('val-import-time');
+                if (timeRow && timeVal) {
+                    timeRow.style.display = 'flex';
+                    timeVal.textContent = formattedTime;
+                }
+            });
 
 
 
@@ -1776,16 +1793,14 @@ function formatDateString(val) {
 }
 
 // Autoload local tmp_exchange_data.xlsx in current path if served on Webserver
-function loadLocalExcelFile(isSilent = false) {
-    if (!isSilent) toggleLoader(true, "กำลังเชื่อมต่อเพื่อดึงไฟล์ tmp_exchange_data.xlsx...");
+async function loadLocalExcelFile(isSilent = false) {
+    if (!isSilent) toggleLoader(true, "กำลังเปิดประมวลผลฐานข้อมูลที่บันทึกไว้...");
 
-    fetch('tmp_exchange_data.xlsx')
-        .then(response => {
-            if (!response.ok) throw new Error("File not found or local browser sandbox restriction.");
-            return response.arrayBuffer();
-        })
-        .then(buffer => {
-            const data = new Uint8Array(buffer);
+    try {
+        // 1️⃣ Check if there is an active spreadsheet dataset stored in IndexedDB
+        const savedData = await getActiveDataset();
+        if (savedData) {
+            const data = new Uint8Array(savedData.arrayBuffer);
             const workbook = XLSX.read(data, {
                 type: 'array',
                 cellDates: true,
@@ -1796,9 +1811,23 @@ function loadLocalExcelFile(isSilent = false) {
             appState.workbook = workbook;
             appState.sheetNames = workbook.SheetNames;
 
-            document.getElementById('val-filename').textContent = "tmp_exchange_data.xlsx";
-            document.getElementById('val-filesize').textContent = "1.45 MB";
+            document.getElementById('val-filename').textContent = savedData.filename;
+            document.getElementById('val-filesize').textContent = formatBytes(savedData.size);
             document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
+
+            // Display persistent import time
+            const importDate = new Date(savedData.timestamp);
+            const formattedTime = importDate.toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น.";
+
+            const timeRow = document.getElementById('row-import-time');
+            const timeVal = document.getElementById('val-import-time');
+            if (timeRow && timeVal) {
+                timeRow.style.display = 'flex';
+                timeVal.textContent = formattedTime;
+            }
 
             const sheetSelect = document.getElementById('select-sheet');
             sheetSelect.innerHTML = '';
@@ -1811,22 +1840,79 @@ function loadLocalExcelFile(isSilent = false) {
 
             const hasDataSheet = workbook.SheetNames.includes('DATA');
             const targetSheet = hasDataSheet ? 'DATA' : workbook.SheetNames[0];
-
             sheetSelect.value = targetSheet;
 
             loadSheetData(targetSheet);
 
-            document.getElementById('val-status').textContent = "เชื่อมต่อสำเร็จ";
+            document.getElementById('val-status').textContent = "เปิดทำงานปกติ";
             document.getElementById('val-status').className = "status-badge success";
             toggleLoader(false);
-        })
-        .catch(err => {
-            console.warn("Auto-load of tmp_exchange_data.xlsx was bypassed. Reason:", err.message);
-            if (!isSilent) {
-                alert("ไม่สามารถดึงข้อมูลผ่านเครือข่ายได้โดยตรง กรุณาลากไฟล์ tmp_exchange_data.xlsx ในเครื่องมาวางที่นี่เพื่อวิเคราะห์ข้อมูลแบบออฟไลน์!");
-            }
-            toggleLoader(false);
+            return;
+        }
+
+        // 2️⃣ Fallback: Fetch default template if nothing was uploaded yet
+        const response = await fetch('tmp_exchange_data.xlsx');
+        if (!response.ok) throw new Error("File not found or local browser sandbox restriction.");
+        
+        const buffer = await response.arrayBuffer();
+        const data = new Uint8Array(buffer);
+        const workbook = XLSX.read(data, {
+            type: 'array',
+            cellDates: true,
+            cellNF: false,
+            cellText: false
         });
+
+        appState.workbook = workbook;
+        appState.sheetNames = workbook.SheetNames;
+
+        document.getElementById('val-filename').textContent = "tmp_exchange_data.xlsx";
+        document.getElementById('val-filesize').textContent = "1.45 MB";
+        document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
+
+        // Auto persist default fetched file in IndexedDB
+        const now = new Date().toISOString();
+        await saveActiveDataset(buffer, "tmp_exchange_data.xlsx", 1520000, now);
+
+        // Display persistent import time
+        const formattedTime = new Date(now).toLocaleDateString('th-TH', {
+            year: 'numeric', month: 'long', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }) + " น.";
+
+        const timeRow = document.getElementById('row-import-time');
+        const timeVal = document.getElementById('val-import-time');
+        if (timeRow && timeVal) {
+            timeRow.style.display = 'flex';
+            timeVal.textContent = formattedTime;
+        }
+
+        const sheetSelect = document.getElementById('select-sheet');
+        sheetSelect.innerHTML = '';
+        workbook.SheetNames.forEach(sheetName => {
+            const opt = document.createElement('option');
+            opt.value = sheetName;
+            opt.textContent = sheetName;
+            sheetSelect.appendChild(opt);
+        });
+
+        const hasDataSheet = workbook.SheetNames.includes('DATA');
+        const targetSheet = hasDataSheet ? 'DATA' : workbook.SheetNames[0];
+        sheetSelect.value = targetSheet;
+
+        loadSheetData(targetSheet);
+
+        document.getElementById('val-status').textContent = "เปิดทำงานปกติ";
+        document.getElementById('val-status').className = "status-badge success";
+        toggleLoader(false);
+
+    } catch (err) {
+        console.warn("Auto-load fallback failed. Reason:", err.message);
+        if (!isSilent) {
+            alert("ไม่สามารถดึงข้อมูลได้สำเร็จ กรุณาลากไฟล์ Excel มาวางเพื่อวิเคราะห์ข้อมูล!");
+        }
+        toggleLoader(false);
+    }
 }
 
 // Load highly complex dynamic Demo Data for demo/test visualization
@@ -1924,7 +2010,68 @@ function loadDemoData() {
 }
 
 // ==========================================================================
-// 🗄️ Firebase Database UI & Loader Modules (Disabled)
+// 🗄️ Local Database Persistence Engine (IndexedDB)
 // ==========================================================================
+const LOCAL_DB_NAME = 'mchmuk_local_store';
+const LOCAL_DB_VERSION = 1;
+const STORE_NAME = 'datasets';
+
+function openLocalDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
+        request.onupgradeneeded = (e) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+        };
+        request.onsuccess = (e) => resolve(e.target.result);
+        request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+async function saveActiveDataset(arrayBuffer, filename, size, customTimestamp = null) {
+    try {
+        const db = await openLocalDB();
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        
+        const timestamp = customTimestamp || new Date().toISOString();
+        const dataRecord = {
+            id: 'active_dataset',
+            arrayBuffer: arrayBuffer,
+            filename: filename,
+            size: size,
+            timestamp: timestamp
+        };
+        
+        store.put(dataRecord);
+        return new Promise((resolve) => {
+            transaction.oncomplete = () => resolve({ ok: true, timestamp });
+            transaction.onerror = () => resolve({ ok: false });
+        });
+    } catch (e) {
+        console.error("IndexedDB Save Error:", e);
+        return { ok: false };
+    }
+}
+
+async function getActiveDataset() {
+    try {
+        const db = await openLocalDB();
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        
+        return new Promise((resolve) => {
+            const request = store.get('active_dataset');
+            request.onsuccess = () => resolve(request.result || null);
+            request.onerror = () => resolve(null);
+        });
+    } catch (e) {
+        console.error("IndexedDB Get Error:", e);
+        return null;
+    }
+}
+
 function refreshBatchList() {}
 function loadLatestActiveBatch() {}
