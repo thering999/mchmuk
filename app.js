@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.2.9 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.3.0 Loaded Successfully");
 
 // --- Global Application State ---
 let appState = {
@@ -33,7 +33,9 @@ let appState = {
     isMophMode: false,
     activeAgeFilter: "all", // all, 6-12, 36-60
     activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
-    activeHospitalFilter: "all"
+    activeHospitalFilter: "all",
+    activeDistrictFilter: "all",
+    importTimestamp: null
 };
 
 // --- ApexCharts Global Instances ---
@@ -77,7 +79,22 @@ window.addEventListener('DOMContentLoaded', () => {
     initMophAgeFilters();
     initMophHctFilters();
 
-    // Bind Hospital select filter
+    // Bind Hospital & District select filters
+    const selectDistrict = document.getElementById('select-district');
+    if (selectDistrict) {
+        selectDistrict.addEventListener('change', (e) => {
+            appState.activeDistrictFilter = e.target.value;
+            // Reset hospital filter on district change
+            appState.activeHospitalFilter = 'all';
+            
+            // Re-populate hospital select under new district
+            populateHospitalSelect();
+            
+            applyAllFilters();
+            triggerAnalyticsUpdate();
+        });
+    }
+
     const selectHospital = document.getElementById('select-hospital');
     if (selectHospital) {
         selectHospital.addEventListener('change', (e) => {
@@ -501,6 +518,7 @@ function processFile(file) {
 
             // Persist the uploaded Excel file in IndexedDB immediately!
             const now = new Date().toISOString();
+            appState.importTimestamp = now;
             saveActiveDataset(arrayBuffer, file.name, file.size, now).then(() => {
                 const formattedTime = new Date(now).toLocaleDateString('th-TH', {
                     year: 'numeric', month: 'long', day: 'numeric',
@@ -633,8 +651,8 @@ function loadSheetData(sheetName) {
     document.getElementById('val-status').className = "status-badge success";
 
     // Set import timestamp dynamically to show user autonomy
-    const now = new Date();
-    const formattedTime = now.toLocaleDateString('th-TH', {
+    const importSource = appState.importTimestamp ? new Date(appState.importTimestamp) : new Date();
+    const formattedTime = importSource.toLocaleDateString('th-TH', {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
@@ -725,6 +743,7 @@ function detectMophIronDataset() {
         const mophHospitalFilter = document.getElementById('moph-hospital-filter');
         if (mophHospitalFilter) {
             mophHospitalFilter.style.display = 'flex';
+            populateDistrictSelect();
             populateHospitalSelect();
         }
         
@@ -744,7 +763,61 @@ function detectMophIronDataset() {
     }
 }
 
-// Dynamically compile and populate hospital select options
+// Dynamically compile and populate district select options
+function populateDistrictSelect() {
+    const select = document.getElementById('select-district');
+    if (!select) return;
+
+    // Reset select options
+    select.innerHTML = '<option value="all">🗺️ ทุกอำเภอ (ทั้งหมด)</option>';
+
+    // Find the district code and name columns
+    const ampcodeCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'ampcode' || l === 'amphurcode' || l === 'amp_code' || l === 'districtcode';
+    });
+    const ampnameCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'ampname' || l === 'amphurname' || l === 'amp_name' || l === 'district' || l.includes('อำเภอ');
+    });
+
+    if (!ampcodeCol && !ampnameCol) return;
+
+    // Scan all rows to collect unique district pairs/names
+    const districtMap = new Map();
+    appState.rawData.forEach(row => {
+        const code = ampcodeCol ? String(row[ampcodeCol] || '').trim() : '';
+        const name = ampnameCol ? String(row[ampnameCol] || '').trim() : '';
+        
+        if (ampcodeCol && code) {
+            districtMap.set(code, name || `อำเภอ ${code}`);
+        } else if (ampnameCol && name) {
+            districtMap.set(name, name);
+        }
+    });
+
+    // Sort keys
+    const sortedKeys = Array.from(districtMap.keys()).sort();
+
+    // Populate options
+    sortedKeys.forEach(key => {
+        const label = districtMap.get(key);
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = ampcodeCol ? `[${key}] - ${label}` : label;
+        select.appendChild(opt);
+    });
+
+    // Set active filter
+    if (appState.activeDistrictFilter) {
+        select.value = appState.activeDistrictFilter;
+    } else {
+        appState.activeDistrictFilter = 'all';
+        select.value = 'all';
+    }
+}
+
+// Dynamically compile and populate hospital select options (with cascading from selected District)
 function populateHospitalSelect() {
     const select = document.getElementById('select-hospital');
     if (!select) return;
@@ -764,11 +837,32 @@ function populateHospitalSelect() {
 
     if (!hoscodeCol || !hosnameCol) return;
 
-    // Scan all rows to collect unique (code, name) pairs
+    // Find district columns to perform cascading check
+    const ampcodeCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'ampcode' || l === 'amphurcode' || l === 'amp_code' || l === 'districtcode';
+    });
+    const ampnameCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'ampname' || l === 'amphurname' || l === 'amp_name' || l === 'district' || l.includes('อำเภอ');
+    });
+
+    // Scan all rows to collect unique (code, name) pairs matching district selection
     const hospitalMap = new Map();
     appState.rawData.forEach(row => {
         const code = String(row[hoscodeCol] || '').trim();
         const name = String(row[hosnameCol] || '').trim();
+
+        // Perform cascading check
+        if (appState.activeDistrictFilter !== 'all') {
+            const dCode = ampcodeCol ? String(row[ampcodeCol] || '').trim() : '';
+            const dName = ampnameCol ? String(row[ampnameCol] || '').trim() : '';
+            const targetDist = appState.activeDistrictFilter;
+            
+            if (ampcodeCol && dCode !== targetDist) return;
+            if (!ampcodeCol && ampnameCol && dName !== targetDist) return;
+        }
+
         if (code && name) {
             hospitalMap.set(code, name);
         }
@@ -903,6 +997,30 @@ function applyAllFilters() {
             }
             return true;
         });
+    }
+
+    // 1.7 Apply Specialized District/Amphur Filter if active
+    if (appState.isMophMode && appState.activeDistrictFilter && appState.activeDistrictFilter !== 'all') {
+        const ampcodeCol = appState.headers.find(h => {
+            const l = h.toLowerCase();
+            return l === 'ampcode' || l === 'amphurcode' || l === 'amp_code' || l === 'districtcode';
+        });
+        const ampnameCol = appState.headers.find(h => {
+            const l = h.toLowerCase();
+            return l === 'ampname' || l === 'amphurname' || l === 'amp_name' || l === 'district' || l.includes('อำเภอ');
+        });
+
+        if (ampcodeCol) {
+            filtered = filtered.filter(row => {
+                const val = String(row[ampcodeCol] || '').trim();
+                return val === appState.activeDistrictFilter;
+            });
+        } else if (ampnameCol) {
+            filtered = filtered.filter(row => {
+                const val = String(row[ampnameCol] || '').trim();
+                return val === appState.activeDistrictFilter;
+            });
+        }
     }
 
     // 1.8 Apply Specialized Hospital/Unit Filter if active
@@ -1935,6 +2053,7 @@ async function loadLocalExcelFile(isSilent = false) {
             document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
 
             // Display persistent import time
+            appState.importTimestamp = savedData.timestamp;
             const importDate = new Date(savedData.timestamp);
             const formattedTime = importDate.toLocaleDateString('th-TH', {
                 year: 'numeric', month: 'long', day: 'numeric',
@@ -1991,6 +2110,7 @@ async function loadLocalExcelFile(isSilent = false) {
 
         // Auto persist default fetched file in IndexedDB
         const now = new Date().toISOString();
+        appState.importTimestamp = now;
         await saveActiveDataset(buffer, "tmp_exchange_data.xlsx", 1520000, now);
 
         // Display persistent import time
