@@ -49,6 +49,46 @@ let charts = {
 // --- Neon Theme Color Palette ---
 const neonColors = ['#00f2fe', '#9d4edd', '#ff007f', '#00ff87', '#ffb300', '#007eff', '#ff6b6b'];
 
+// --- Helper to verify if a hospital code/name belongs to a public MOPH service unit in Mukdahan (excluding clinics/private hospitals) ---
+function isPublicMophHospital(code, name) {
+    if (!code) return false;
+    
+    // 1. Look up name from our database if missing
+    let finalName = name || '';
+    if (!finalName && typeof MUKDAHAN_HOSPITALS !== 'undefined' && MUKDAHAN_HOSPITALS[code]) {
+        finalName = MUKDAHAN_HOSPITALS[code].hosname;
+    }
+    
+    if (!finalName) return false;
+    const lowerName = finalName.toLowerCase();
+
+    // 2. Exclude administrative offices, clinics, private labs, and individual nursing centers
+    if (lowerName.includes('คลินิก') || 
+        lowerName.includes('เวชกรรม') || 
+        lowerName.includes('ทันตกรรม') || 
+        lowerName.includes('ทันคกรรม') || 
+        lowerName.includes('แล็บ') || 
+        lowerName.includes('แลป') || 
+        lowerName.includes('การพยาบาล') || 
+        lowerName.includes('การผดุงครรภ์') || 
+        lowerName.includes('กายภาพบำบัด') || 
+        lowerName.includes('การแพทย์แผนไทย') ||
+        lowerName.includes('สำนักงานสาธารณสุข') || 
+        lowerName.includes('เรือนจำ')) {
+        return false;
+    }
+
+    // 3. Exclude known private hospitals in Mukdahan
+    if (lowerName.includes('อินเตอร์เนชั่นแนล') || 
+        lowerName.includes('พริ้นซ์') || 
+        code === '11974' || 
+        code === '53630') {
+        return false;
+    }
+
+    return true;
+}
+
 // ==========================================================================
 // 🚀 Initialization, Authentication & Event Listeners
 // ==========================================================================
@@ -824,7 +864,23 @@ function populateDistrictSelect() {
 
     // Scan all rows to collect unique district pairs/names
     const districtMap = new Map();
+    const hoscodeCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'hoscode' || l === 'hospcode' || l === 'hcode';
+    });
+    const hosnameCol = appState.headers.find(h => {
+        const l = h.toLowerCase();
+        return l === 'hosname' || l === 'hname' || l === 'hospital';
+    });
+
     appState.rawData.forEach(row => {
+        // Exclude clinics and private hospitals
+        if (hoscodeCol) {
+            const hCode = String(row[hoscodeCol] || '').trim();
+            const hName = hosnameCol ? String(row[hosnameCol] || '').trim() : '';
+            if (!isPublicMophHospital(hCode, hName)) return;
+        }
+
         const code = ampcodeCol ? String(row[ampcodeCol] || '').trim() : '';
         const name = ampnameCol ? String(row[ampnameCol] || '').trim() : '';
         
@@ -891,6 +947,9 @@ function populateHospitalSelect() {
     appState.rawData.forEach(row => {
         const code = String(row[hoscodeCol] || '').trim();
         const name = String(row[hosnameCol] || '').trim();
+
+        // Exclude clinics and private hospitals
+        if (!isPublicMophHospital(code, name)) return;
 
         // Perform cascading check
         if (appState.activeDistrictFilter !== 'all') {
@@ -992,6 +1051,26 @@ function populateDimensionSelects() {
 
 function applyAllFilters() {
     let filtered = [...appState.rawData];
+
+    // 1.0 Filter out non-public MOPH units (clinics, private hospitals, SSOs, etc.) when in MOPH mode
+    if (appState.isMophMode) {
+        const hoscodeCol = appState.headers.find(h => {
+            const l = h.toLowerCase();
+            return l === 'hoscode' || l === 'hospcode' || l === 'hcode';
+        });
+        const hosnameCol = appState.headers.find(h => {
+            const l = h.toLowerCase();
+            return l === 'hosname' || l === 'hname' || l === 'hospital';
+        });
+        
+        if (hoscodeCol) {
+            filtered = filtered.filter(row => {
+                const code = String(row[hoscodeCol] || '').trim();
+                const name = hosnameCol ? String(row[hosnameCol] || '').trim() : '';
+                return isPublicMophHospital(code, name);
+            });
+        }
+    }
 
     // 1. Apply Specialized MOPH Age Filter if active
     if (appState.isMophMode) {
