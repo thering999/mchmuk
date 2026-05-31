@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.3.0 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.3.1 Loaded Successfully");
 
 // --- Global Application State ---
 let appState = {
@@ -617,6 +617,45 @@ function loadSheetData(sheetName) {
                 }
             }
         });
+
+        // --- 🏥 Enrich District and Hospital Names from built-in SQL Lookup Dictionary ---
+        const hoscodeKey = Object.keys(row).find(k => {
+            const l = k.toLowerCase();
+            return l === 'hoscode' || l === 'hospcode' || l === 'hcode';
+        });
+
+        if (hoscodeKey) {
+            const paddedHoscode = row[hoscodeKey];
+            if (typeof MUKDAHAN_HOSPITALS !== 'undefined' && MUKDAHAN_HOSPITALS[paddedHoscode]) {
+                const info = MUKDAHAN_HOSPITALS[paddedHoscode];
+                
+                // Set normalized amp_code and amp_name
+                row['amp_code'] = info.amp_code;
+                row['ampcode'] = info.amp_code;
+                row['amp_name'] = info.amp_name;
+                row['ampname'] = info.amp_name;
+                
+                if (appState.rawDataText[row.__rowIdx__]) {
+                    appState.rawDataText[row.__rowIdx__]['amp_code'] = info.amp_code;
+                    appState.rawDataText[row.__rowIdx__]['ampcode'] = info.amp_code;
+                    appState.rawDataText[row.__rowIdx__]['amp_name'] = info.amp_name;
+                    appState.rawDataText[row.__rowIdx__]['ampname'] = info.amp_name;
+                }
+
+                // If hospital name is missing or blank, enrich it too!
+                const hosnameKey = Object.keys(row).find(k => {
+                    const l = k.toLowerCase();
+                    return l === 'hosname' || l === 'hname' || l === 'hospital';
+                }) || 'hosname';
+
+                if (!row[hosnameKey]) {
+                    row[hosnameKey] = info.hosname;
+                    if (appState.rawDataText[row.__rowIdx__]) {
+                        appState.rawDataText[row.__rowIdx__][hosnameKey] = info.hosname;
+                    }
+                }
+            }
+        }
     });
 
     appState.rawData = jsonData;
