@@ -601,7 +601,14 @@ function processFile(file) {
             const timeVal = document.getElementById('val-import-time');
             if (timeRow && timeVal) {
                 timeRow.style.display = 'flex';
-                timeVal.textContent = formattedTime;
+                timeVal.textContent = formattedTime + " (เครื่องคุณกำลังอัปโหลดไปยัง Server)";
+            }
+
+            const fetchRow = document.getElementById('row-fetch-time');
+            const fetchVal = document.getElementById('val-fetch-time');
+            if (fetchRow && fetchVal) {
+                fetchRow.style.display = 'flex';
+                fetchVal.textContent = formattedTime;
             }
 
             // Push ไฟล์ขึ้น GitHub ผ่าน API — ทุก user ทุกเครื่องได้ข้อมูลล่าสุดเสมอ
@@ -778,7 +785,16 @@ function loadSheetData(sheetName) {
     const timeVal = document.getElementById('val-import-time');
     if (timeRow && timeVal) {
         timeRow.style.display = 'flex';
-        timeVal.textContent = formattedTime;
+        // หากเป็นการโหลดจากเซิร์ฟเวอร์และมีตัวระบุว่าดึงมาจาก Server
+        if (appState.importTimestamp && appState.importTimestamp.includes('Z')) {
+            const dateObj = new Date(appState.importTimestamp);
+            timeVal.textContent = dateObj.toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น. (Server)";
+        } else {
+            timeVal.textContent = formattedTime;
+        }
     }
 
     // Update notice to show successful analysis by user
@@ -2255,11 +2271,24 @@ async function loadLocalExcelFile(isSilent = false) {
             }) + " น. (Local)";
         }
 
+        // 1. แสดงวันเวลานำเข้าข้อมูลจริงบน Server
         const timeRow = document.getElementById('row-import-time');
         const timeVal = document.getElementById('val-import-time');
         if (timeRow && timeVal) {
             timeRow.style.display = 'flex';
             timeVal.textContent = formattedTime;
+        }
+
+        // 2. แสดงวันเวลาที่เบราว์เซอร์เปิดมาดึงข้อมูลจริงในปัจจุบัน
+        const fetchRow = document.getElementById('row-fetch-time');
+        const fetchVal = document.getElementById('val-fetch-time');
+        if (fetchRow && fetchVal) {
+            fetchRow.style.display = 'flex';
+            const nowTime = new Date().toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น.";
+            fetchVal.textContent = nowTime;
         }
 
         const sheetSelect = document.getElementById('select-sheet');
