@@ -2364,14 +2364,14 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
 
     if (!token) {
         showToast('⚠️ ยังไม่ได้ตั้งค่า GitHub Token — ข้อมูลถูกวิเคราะห์บนหน้าจอแล้ว แต่ยังไม่ได้บันทึกไปยัง Server กลาง กรุณาตั้งค่า PAT ในหน้า Admin Settings', 'warn', 8000);
-        console.warn('💡 Admin: ตั้งค่า PAT โดย localStorage.setItem("mchmuk_gh_pat", "ghp_xxx...") แล้วรีเฟรชหน้า');
         return;
     }
 
-    showToast('☁️ กำลังบันทึกไฟล์ข้อมูลไปยัง Server กลาง (GitHub)...', 'info', 3000);
+    const actionsUrl = `https://github.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/actions`;
 
     try {
-        // 1. ดึง SHA ของไฟล์เดิม (จำเป็นสำหรับการ update)
+        // Step 1: ดึง SHA ของไฟล์เดิม
+        showToast('☁️ [1/3] กำลังเชื่อมต่อ GitHub...', 'info', 3000);
         const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`;
         const headers = {
             'Authorization': `Bearer ${token}`,
@@ -2387,35 +2387,45 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
             existingSha = getJson.sha;
         }
 
-        // 2. แปลง ArrayBuffer → Base64
+        // Step 2: แปลง ArrayBuffer → Base64
+        showToast('☁️ [2/3] กำลังเตรียมข้อมูล...', 'info', 3000);
         const base64 = arrayBufferToBase64(arrayBuffer);
 
-        // 3. Push ไฟล์ใหม่
-        const commitMsg = `📊 อัปเดตข้อมูล HDC โดย Admin เมื่อ ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.`;
-        const body = {
-            message: commitMsg,
-            content: base64,
-            branch: GITHUB_CONFIG.branch
-        };
+        // Step 3: Push ไฟล์ใหม่
+        const now = new Date();
+        const commitMsg = `📊 อัปเดตข้อมูล HDC โดย Admin เมื่อ ${now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น. (${originalFilename})`;
+        const body = { message: commitMsg, content: base64, branch: GITHUB_CONFIG.branch };
         if (existingSha) body.sha = existingSha;
 
-        const putRes = await fetch(apiUrl, {
-            method: 'PUT',
-            headers,
-            body: JSON.stringify(body)
-        });
+        showToast('☁️ [3/3] กำลัง Push ข้อมูลขึ้น GitHub...', 'info', 4000);
+        const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
 
         if (putRes.ok) {
-            showToast('✅ บันทึกข้อมูลไปยัง Server กลางสำเร็จ! ผู้ใช้ทุกคนทุกเครื่องจะเห็นข้อมูลล่าสุดภายใน 1-2 นาที', 'success', 6000);
-            console.log('☁️ GitHub push success:', await putRes.json());
+            const result = await putRes.json();
+            const commitSha = result?.commit?.sha?.slice(0, 7) || '';
+            showToast(
+                `✅ Push สำเร็จ! (commit: ${commitSha})<br>` +
+                `🚀 GitHub Actions กำลัง Deploy อัตโนมัติ — ` +
+                `<a href="${actionsUrl}" target="_blank" style="color:#00ff87;text-decoration:underline;">ดู Actions →</a><br>` +
+                `⏱️ ผู้ใช้ทุกคนจะเห็นข้อมูลใหม่ภายใน ~1-2 นาที`,
+                'success', 10000
+            );
+            console.log(`☁️ GitHub push success — commit: ${result?.commit?.sha}`);
+            console.log(`🚀 Actions deploying: ${actionsUrl}`);
         } else {
             const errJson = await putRes.json().catch(() => ({}));
             const errMsg = errJson.message || putRes.statusText;
-            showToast(`❌ บันทึกไปยัง Server ไม่สำเร็จ: ${errMsg}`, 'error', 6000);
+            if (putRes.status === 401) {
+                showToast('❌ Token ไม่ถูกต้องหรือหมดอายุ — กรุณาตั้งค่า GitHub Token ใหม่', 'error', 8000);
+            } else if (putRes.status === 403) {
+                showToast('❌ Token ไม่มีสิทธิ์เขียน — ต้องมี scope: repo', 'error', 8000);
+            } else {
+                showToast(`❌ Push ไม่สำเร็จ (${putRes.status}): ${errMsg}`, 'error', 6000);
+            }
             console.error('GitHub push failed:', errJson);
         }
     } catch (e) {
-        showToast(`❌ เกิดข้อผิดพลาดในการบันทึก: ${e.message}`, 'error', 6000);
+        showToast(`❌ เกิดข้อผิดพลาด: ${e.message}`, 'error', 6000);
         console.error('GitHub push error:', e);
     }
 }
@@ -2437,13 +2447,13 @@ function arrayBufferToBase64(buffer) {
  * ใช้: setGitHubToken('ghp_xxxxxxxxxxxx')
  */
 function setGitHubToken(token) {
-    if (!token || !token.startsWith('ghp_')) {
-        console.error('❌ Token ไม่ถูกต้อง ต้องขึ้นต้นด้วย ghp_');
+    if (!token || (!token.startsWith('ghp_') && !token.startsWith('github_pat_'))) {
+        console.error('❌ Token ไม่ถูกต้อง ต้องขึ้นต้นด้วย ghp_ หรือ github_pat_');
         return;
     }
     localStorage.setItem('mchmuk_gh_pat', token);
-    showToast('🔑 บันทึก GitHub Token สำเร็จ! ตอนนี้ Admin สามารถ upload Excel แล้วข้อมูลจะถูกบันทึกไปยัง Server กลาง', 'success', 5000);
-    console.log('✅ GitHub PAT saved. Admin can now push Excel to GitHub repo.');
+    showToast('🔑 บันทึก GitHub Token สำเร็จ! ตอนนี้ Admin สามารถ upload Excel แล้วข้อมูลจะถูกบันทึกไปยัง Server กลาง และ Deploy อัตโนมัติ', 'success', 5000);
+    console.log('✅ GitHub PAT saved. Admin can now push Excel to GitHub repo → auto-deploy via Actions.');
 }
 
 /**
