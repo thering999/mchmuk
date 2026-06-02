@@ -5,7 +5,23 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.3.1 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.4.0 Loaded Successfully");
+
+// ==========================================================================
+// ☁️ GitHub Storage Configuration (Central Data Persistence)
+// Admin uploads are pushed to GitHub repo so ALL users see the same data.
+// Regular users simply fetch the file — no upload needed.
+// ==========================================================================
+const GITHUB_CONFIG = {
+    owner: 'thering999',
+    repo: 'mchmuk',
+    branch: 'main',
+    filePath: 'tmp_exchange_data.xlsx',
+    // Admin must set a Personal Access Token with 'repo' scope
+    // Store in localStorage key 'mchmuk_gh_pat' (Admin only, never exposed to viewers)
+    get token() { return localStorage.getItem('mchmuk_gh_pat') || ''; }
+};
+const DATASET_URL = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.filePath}`;
 
 // --- Global Application State ---
 let appState = {
@@ -229,12 +245,23 @@ function onUserLoginSuccess(user, role, data) {
     document.getElementById('val-user-role').textContent = role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'ผู้ดูข้อมูล (Viewer)';
     document.getElementById('user-avatar-char').textContent = displayName[0].toUpperCase();
 
-    // Role-based capability: Admin sees the file dropzone, Viewer only selects existing databases!
+    // Role-based capability: Admin sees the file dropzone AND GitHub config, Viewer only views data!
     const dropzone = document.getElementById('dropzone');
+    const adminGhConfig = document.getElementById('admin-github-config');
     if (role === 'admin') {
         dropzone.style.display = 'flex';
+        if (adminGhConfig) {
+            adminGhConfig.style.display = 'block';
+            // ตรวจสอบว่ามี PAT อยู่แล้วหรือไม่
+            const existingToken = localStorage.getItem('mchmuk_gh_pat');
+            const patStatus = document.getElementById('github-pat-status');
+            if (existingToken && patStatus) {
+                patStatus.style.display = 'block';
+            }
+        }
     } else {
         dropzone.style.display = 'none';
+        if (adminGhConfig) adminGhConfig.style.display = 'none';
     }
 
     // Status Badge
@@ -263,6 +290,9 @@ function onUserLogoutSuccess() {
     
     const dropzone = document.getElementById('dropzone');
     if (dropzone) dropzone.style.display = 'none';
+    
+    const adminGhConfig = document.getElementById('admin-github-config');
+    if (adminGhConfig) adminGhConfig.style.display = 'none';
     
     const statusVal = document.getElementById('val-status');
     if (statusVal) {
@@ -556,22 +586,24 @@ function processFile(file) {
 
             loadSheetData(targetSheet);
 
-            // Persist the uploaded Excel file in IndexedDB immediately!
+            // ☁️ Push to GitHub so ALL users (any device) get the same data!
             const now = new Date().toISOString();
             appState.importTimestamp = now;
-            saveActiveDataset(arrayBuffer, file.name, file.size, now).then(() => {
-                const formattedTime = new Date(now).toLocaleDateString('th-TH', {
-                    year: 'numeric', month: 'long', day: 'numeric',
-                    hour: '2-digit', minute: '2-digit', second: '2-digit'
-                }) + " น.";
 
-                const timeRow = document.getElementById('row-import-time');
-                const timeVal = document.getElementById('val-import-time');
-                if (timeRow && timeVal) {
-                    timeRow.style.display = 'flex';
-                    timeVal.textContent = formattedTime;
-                }
-            });
+            const formattedTime = new Date(now).toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น.";
+
+            const timeRow = document.getElementById('row-import-time');
+            const timeVal = document.getElementById('val-import-time');
+            if (timeRow && timeVal) {
+                timeRow.style.display = 'flex';
+                timeVal.textContent = formattedTime;
+            }
+
+            // Push ไฟล์ขึ้น GitHub ผ่าน API — ทุก user ทุกเครื่องได้ข้อมูลล่าสุดเสมอ
+            pushExcelToGitHub(arrayBuffer, file.name);
 
 
 
@@ -2147,69 +2179,19 @@ function formatDateString(val) {
     return String(val);
 }
 
-// Autoload local tmp_exchange_data.xlsx in current path if served on Webserver
+// ☁️ Fetch ไฟล์ข้อมูลกลางจาก GitHub (raw) — ทำงานทุกเครื่อง ทุก user
 async function loadLocalExcelFile(isSilent = false) {
-    if (!isSilent) toggleLoader(true, "กำลังเปิดประมวลผลฐานข้อมูลที่บันทึกไว้...");
+    if (!isSilent) toggleLoader(true, "กำลังดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์กลาง...");
 
     try {
-        // 1️⃣ Check if there is an active spreadsheet dataset stored in IndexedDB
-        const savedData = await getActiveDataset();
-        if (savedData) {
-            const data = new Uint8Array(savedData.arrayBuffer);
-            const workbook = XLSX.read(data, {
-                type: 'array',
-                cellDates: true,
-                cellNF: false,
-                cellText: false
-            });
+        // ดึงจาก GitHub raw URL เพื่อให้ทุกเครื่องเห็นข้อมูลเดียวกัน
+        // เพิ่ม cache-bust เพื่อไม่ให้ browser cache ไฟล์เก่า
+        const cacheBust = Date.now();
+        const fetchUrl = `${DATASET_URL}?cb=${cacheBust}`;
 
-            appState.workbook = workbook;
-            appState.sheetNames = workbook.SheetNames;
+        const response = await fetch(fetchUrl);
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ไม่พบไฟล์ข้อมูลบน server`);
 
-            document.getElementById('val-filename').textContent = savedData.filename;
-            document.getElementById('val-filesize').textContent = formatBytes(savedData.size);
-            document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
-
-            // Display persistent import time
-            appState.importTimestamp = savedData.timestamp;
-            const importDate = new Date(savedData.timestamp);
-            const formattedTime = importDate.toLocaleDateString('th-TH', {
-                year: 'numeric', month: 'long', day: 'numeric',
-                hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }) + " น.";
-
-            const timeRow = document.getElementById('row-import-time');
-            const timeVal = document.getElementById('val-import-time');
-            if (timeRow && timeVal) {
-                timeRow.style.display = 'flex';
-                timeVal.textContent = formattedTime;
-            }
-
-            const sheetSelect = document.getElementById('select-sheet');
-            sheetSelect.innerHTML = '';
-            workbook.SheetNames.forEach(sheetName => {
-                const opt = document.createElement('option');
-                opt.value = sheetName;
-                opt.textContent = sheetName;
-                sheetSelect.appendChild(opt);
-            });
-
-            const hasDataSheet = workbook.SheetNames.includes('DATA');
-            const targetSheet = hasDataSheet ? 'DATA' : workbook.SheetNames[0];
-            sheetSelect.value = targetSheet;
-
-            loadSheetData(targetSheet);
-
-            document.getElementById('val-status').textContent = "เปิดทำงานปกติ";
-            document.getElementById('val-status').className = "status-badge success";
-            toggleLoader(false);
-            return;
-        }
-
-        // 2️⃣ Fallback: Fetch default template if nothing was uploaded yet
-        const response = await fetch('tmp_exchange_data.xlsx');
-        if (!response.ok) throw new Error("File not found or local browser sandbox restriction.");
-        
         const buffer = await response.arrayBuffer();
         const data = new Uint8Array(buffer);
         const workbook = XLSX.read(data, {
@@ -2222,16 +2204,13 @@ async function loadLocalExcelFile(isSilent = false) {
         appState.workbook = workbook;
         appState.sheetNames = workbook.SheetNames;
 
-        document.getElementById('val-filename').textContent = "tmp_exchange_data.xlsx";
-        document.getElementById('val-filesize').textContent = "1.45 MB";
+        document.getElementById('val-filename').textContent = GITHUB_CONFIG.filePath;
+        document.getElementById('val-filesize').textContent = formatBytes(buffer.byteLength);
         document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
 
-        // Auto persist default fetched file in IndexedDB
+        // แสดงเวลาที่ดึงข้อมูลมา
         const now = new Date().toISOString();
         appState.importTimestamp = now;
-        await saveActiveDataset(buffer, "tmp_exchange_data.xlsx", 1520000, now);
-
-        // Display persistent import time
         const formattedTime = new Date(now).toLocaleDateString('th-TH', {
             year: 'numeric', month: 'long', day: 'numeric',
             hour: '2-digit', minute: '2-digit', second: '2-digit'
@@ -2241,7 +2220,7 @@ async function loadLocalExcelFile(isSilent = false) {
         const timeVal = document.getElementById('val-import-time');
         if (timeRow && timeVal) {
             timeRow.style.display = 'flex';
-            timeVal.textContent = formattedTime;
+            timeVal.textContent = `ดึงข้อมูลจาก Server เมื่อ ${formattedTime}`;
         }
 
         const sheetSelect = document.getElementById('select-sheet');
@@ -2263,12 +2242,16 @@ async function loadLocalExcelFile(isSilent = false) {
         document.getElementById('val-status').className = "status-badge success";
         toggleLoader(false);
 
-    } catch (err) {
-        console.warn("Auto-load fallback failed. Reason:", err.message);
         if (!isSilent) {
-            alert("ไม่สามารถดึงข้อมูลได้สำเร็จ กรุณาลากไฟล์ Excel มาวางเพื่อวิเคราะห์ข้อมูล!");
+            showToast('☁️ ดึงข้อมูลจากเซิร์ฟเวอร์กลางสำเร็จ! ข้อมูลเป็นปัจจุบัน', 'success', 4000);
         }
+
+    } catch (err) {
+        console.warn("Server fetch failed:", err.message);
         toggleLoader(false);
+        if (!isSilent) {
+            showToast(`⚠️ ไม่สามารถดึงข้อมูลจาก Server: ${err.message}`, 'warn', 6000);
+        }
     }
 }
 
@@ -2367,68 +2350,134 @@ function loadDemoData() {
 }
 
 // ==========================================================================
-// 🗄️ Local Database Persistence Engine (IndexedDB)
+// ☁️ GitHub API — Central Data Persistence Engine
+// Admin uploads push Excel to GitHub repo → all users fetch same file
 // ==========================================================================
-const LOCAL_DB_NAME = 'mchmuk_local_store';
-const LOCAL_DB_VERSION = 1;
-const STORE_NAME = 'datasets';
 
-function openLocalDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(LOCAL_DB_NAME, LOCAL_DB_VERSION);
-        request.onupgradeneeded = (e) => {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-            }
-        };
-        request.onsuccess = (e) => resolve(e.target.result);
-        request.onerror = (e) => reject(e.target.error);
-    });
-}
+/**
+ * Push Excel file to GitHub repository via API
+ * ต้องมี PAT (Personal Access Token) ที่มี scope 'repo'
+ * Admin ตั้งค่าได้ที่: localStorage.setItem('mchmuk_gh_pat', 'ghp_xxxx...')
+ */
+async function pushExcelToGitHub(arrayBuffer, originalFilename) {
+    const token = GITHUB_CONFIG.token;
 
-async function saveActiveDataset(arrayBuffer, filename, size, customTimestamp = null) {
+    if (!token) {
+        showToast('⚠️ ยังไม่ได้ตั้งค่า GitHub Token — ข้อมูลถูกวิเคราะห์บนหน้าจอแล้ว แต่ยังไม่ได้บันทึกไปยัง Server กลาง กรุณาตั้งค่า PAT ในหน้า Admin Settings', 'warn', 8000);
+        console.warn('💡 Admin: ตั้งค่า PAT โดย localStorage.setItem("mchmuk_gh_pat", "ghp_xxx...") แล้วรีเฟรชหน้า');
+        return;
+    }
+
+    showToast('☁️ กำลังบันทึกไฟล์ข้อมูลไปยัง Server กลาง (GitHub)...', 'info', 3000);
+
     try {
-        const db = await openLocalDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        
-        const timestamp = customTimestamp || new Date().toISOString();
-        const dataRecord = {
-            id: 'active_dataset',
-            arrayBuffer: arrayBuffer,
-            filename: filename,
-            size: size,
-            timestamp: timestamp
+        // 1. ดึง SHA ของไฟล์เดิม (จำเป็นสำหรับการ update)
+        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`;
+        const headers = {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json'
         };
-        
-        store.put(dataRecord);
-        return new Promise((resolve) => {
-            transaction.oncomplete = () => resolve({ ok: true, timestamp });
-            transaction.onerror = () => resolve({ ok: false });
+
+        let existingSha = null;
+        const getRes = await fetch(apiUrl, { headers });
+        if (getRes.ok) {
+            const getJson = await getRes.json();
+            existingSha = getJson.sha;
+        }
+
+        // 2. แปลง ArrayBuffer → Base64
+        const base64 = arrayBufferToBase64(arrayBuffer);
+
+        // 3. Push ไฟล์ใหม่
+        const commitMsg = `📊 อัปเดตข้อมูล HDC โดย Admin เมื่อ ${new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น.`;
+        const body = {
+            message: commitMsg,
+            content: base64,
+            branch: GITHUB_CONFIG.branch
+        };
+        if (existingSha) body.sha = existingSha;
+
+        const putRes = await fetch(apiUrl, {
+            method: 'PUT',
+            headers,
+            body: JSON.stringify(body)
         });
+
+        if (putRes.ok) {
+            showToast('✅ บันทึกข้อมูลไปยัง Server กลางสำเร็จ! ผู้ใช้ทุกคนทุกเครื่องจะเห็นข้อมูลล่าสุดภายใน 1-2 นาที', 'success', 6000);
+            console.log('☁️ GitHub push success:', await putRes.json());
+        } else {
+            const errJson = await putRes.json().catch(() => ({}));
+            const errMsg = errJson.message || putRes.statusText;
+            showToast(`❌ บันทึกไปยัง Server ไม่สำเร็จ: ${errMsg}`, 'error', 6000);
+            console.error('GitHub push failed:', errJson);
+        }
     } catch (e) {
-        console.error("IndexedDB Save Error:", e);
-        return { ok: false };
+        showToast(`❌ เกิดข้อผิดพลาดในการบันทึก: ${e.message}`, 'error', 6000);
+        console.error('GitHub push error:', e);
     }
 }
 
-async function getActiveDataset() {
-    try {
-        const db = await openLocalDB();
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        
-        return new Promise((resolve) => {
-            const request = store.get('active_dataset');
-            request.onsuccess = () => resolve(request.result || null);
-            request.onerror = () => resolve(null);
-        });
-    } catch (e) {
-        console.error("IndexedDB Get Error:", e);
-        return null;
+/** แปลง ArrayBuffer เป็น Base64 string */
+function arrayBufferToBase64(buffer) {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        const chunk = bytes.subarray(i, i + chunkSize);
+        binary += String.fromCharCode(...chunk);
     }
+    return btoa(binary);
 }
 
+/**
+ * Admin ตั้งค่า GitHub PAT — เรียกจาก console หรือ Admin UI
+ * ใช้: setGitHubToken('ghp_xxxxxxxxxxxx')
+ */
+function setGitHubToken(token) {
+    if (!token || !token.startsWith('ghp_')) {
+        console.error('❌ Token ไม่ถูกต้อง ต้องขึ้นต้นด้วย ghp_');
+        return;
+    }
+    localStorage.setItem('mchmuk_gh_pat', token);
+    showToast('🔑 บันทึก GitHub Token สำเร็จ! ตอนนี้ Admin สามารถ upload Excel แล้วข้อมูลจะถูกบันทึกไปยัง Server กลาง', 'success', 5000);
+    console.log('✅ GitHub PAT saved. Admin can now push Excel to GitHub repo.');
+}
+
+/**
+ * saveAdminPAT() — เรียกจากปุ่ม UI ใน Admin section
+ * อ่านค่าจาก input#input-gh-pat แล้วบันทึก Token
+ */
+function saveAdminPAT() {
+    const input = document.getElementById('input-gh-pat');
+    if (!input) return;
+    const token = input.value.trim();
+
+    if (!token) {
+        showToast('⚠️ กรุณาระบุ GitHub Personal Access Token', 'warn', 3000);
+        return;
+    }
+    if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
+        showToast('❌ Token ไม่ถูกต้อง ต้องขึ้นต้นด้วย ghp_ หรือ github_pat_', 'error', 4000);
+        return;
+    }
+
+    localStorage.setItem('mchmuk_gh_pat', token);
+    input.value = ''; // ล้าง input หลังบันทึก
+
+    // แสดง status
+    const patStatus = document.getElementById('github-pat-status');
+    if (patStatus) patStatus.style.display = 'block';
+
+    showToast('🔑 บันทึก GitHub Token สำเร็จ! ตอนนี้ Admin สามารถ Upload Excel เพื่อบันทึกข้อมูลไปยัง Server กลางได้เลย', 'success', 6000);
+    console.log('✅ GitHub PAT saved successfully. Admin can now push Excel files to GitHub repo.');
+    lucide.createIcons();
+}
+
+// Stub functions (ไม่ใช้ IndexedDB แล้ว)
 function refreshBatchList() {}
 function loadLatestActiveBatch() {}
+async function saveActiveDataset() { return { ok: true }; }
+async function getActiveDataset() { return null; }

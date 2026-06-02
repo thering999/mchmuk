@@ -293,6 +293,29 @@
                 </button>
             </div>
 
+            <!-- Admin GitHub Token Setup (only visible to admin after login) -->
+            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 14px 18px; background: rgba(157, 78, 221, 0.08); border: 1px dashed rgba(157, 78, 221, 0.4); border-radius: 12px;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <i data-lucide="github" style="width: 18px; height: 18px; color: var(--neon-purple);"></i>
+                    <span style="color: var(--neon-purple); font-weight: 700; font-size: 0.9rem;">ตั้งค่า GitHub Token (Admin เท่านั้น)</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="password" id="input-gh-pat" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" 
+                           style="flex: 1; background: rgba(15,23,42,0.8); border: 1px solid rgba(157,78,221,0.4); color: #e2e8f0; border-radius: 8px; padding: 8px 14px; font-size: 0.85rem; font-family: monospace;">
+                    <button class="btn" onclick="saveAdminPAT()" style="background: linear-gradient(135deg, var(--neon-purple) 0%, var(--neon-pink) 100%); border-color: var(--neon-purple); white-space: nowrap; font-size: 0.85rem; padding: 8px 14px;">
+                        <i data-lucide="key-round"></i> บันทึก Token
+                    </button>
+                </div>
+                <p style="color: var(--text-muted); font-size: 0.75rem; margin-top: 8px;">
+                    ⚠️ ต้องการ Personal Access Token ที่มี scope <code style="color: var(--neon-cyan);">repo</code> — สร้างได้ที่ 
+                    <a href="https://github.com/settings/tokens" target="_blank" style="color: var(--neon-cyan);">github.com/settings/tokens</a> | 
+                    Token ถูกเก็บใน localStorage และไม่ถูกส่งให้ผู้อื่น
+                </p>
+                <div id="github-pat-status" style="display: none; margin-top: 6px; font-size: 0.8rem; color: #00ff87;">
+                    ✅ Token บันทึกไว้แล้ว — Admin สามารถ upload Excel เพื่อบันทึกไปยัง Server กลางได้
+                </div>
+            </div>
+
             <!-- File Details Card -->
             <div class="file-info-card">
                 <div class="info-row">
@@ -373,10 +396,10 @@
             <div style="font-size: 4rem; color: var(--neon-cyan); margin-bottom: 20px; animation: float 3s ease-in-out infinite;">
                 <i data-lucide="bar-chart-3" style="width: 80px; height: 80px;"></i>
             </div>
-            <h2 style="font-family: var(--font-display); letter-spacing: 2px; margin-bottom: 12px; color: var(--neon-cyan);">ยินดีต้อนรับสู่ระบบจำลองข้อมูลแบบมีมิติ</h2>
-            <p style="color: var(--text-secondary); max-width: 600px; margin: 0 auto 24px auto;">
-                กรุณาอัปโหลดไฟล์ Excel ของคุณ หรือกดปุ่ม <strong>"Load local Excel"</strong> เพื่อดึงข้อมูลไฟล์ <code>tmp_exchange_data.xlsx</code> ที่มีอยู่ในระบบโดยอัตโนมัติ 
-                เพื่อสร้างแดชบอร์ดล้ำสมัยที่วิเคราะห์เปรียบเทียบข้อมูลได้อย่างทันใจ!
+            <h2 style="font-family: var(--font-display); letter-spacing: 2px; margin-bottom: 12px; color: var(--neon-cyan);">ยินดีต้อนรับสู่ระบบวิเคราะห์ข้อมูล HDC มุกดาหาร</h2>
+            <p style="color: var(--text-secondary); max-width: 620px; margin: 0 auto 24px auto; line-height: 1.7;">
+                <span style="color: var(--neon-cyan);">☁️ กำลังโหลดข้อมูลล่าสุดจาก Server กลาง...</span><br>
+                ผู้ใช้ทั่วไป<strong> ไม่ต้อง Upload ไฟล์ Excel</strong> — ข้อมูลถูกนำเข้าโดย Admin และบันทึกไว้กลางเรียบร้อยแล้ว
             </p>
             <div>
                 <button class="btn" id="btn-demo-data">
@@ -583,7 +606,7 @@
         </div>
 
         <footer>
-            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.3.1 (อัปเดต: 31 พ.ค. 2569 เวลา 20:02 น.) | Built with Premium Custom CSS and Javascript.
+            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.4.0 (อัปเดต: 2 มิ.ย. 2569) | ☁️ Central GitHub Data Persistence | Built with Premium Custom CSS and Javascript.
         </footer>
 
     </div>
