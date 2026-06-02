@@ -6,8 +6,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Data files (sensitive patient data - do NOT commit)
-tmp_exchange_data.xlsx
+# Data files - allow ONLY the central dataset file to be committed
+# tmp_exchange_data.xlsx is the shared dataset fetched by ALL users
+!tmp_exchange_data.xlsx
 *.xlsx
 *.xls
 *.csv
