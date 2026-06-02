@@ -2181,6 +2181,31 @@ function formatDateString(val) {
     return String(val);
 }
 
+// ดึงเวลา Commit ล่าสุดของไฟล์ข้อมูลจาก GitHub เพื่อระบุ "วันที่นำเข้าข้อมูลจริง"
+async function getFileLastCommitDate() {
+    try {
+        const token = GITHUB_CONFIG.token;
+        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/commits?path=${GITHUB_CONFIG.filePath}&page=1&per_page=1`;
+        const headers = {
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+        };
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+        const res = await fetch(apiUrl, { headers });
+        if (res.ok) {
+            const commits = await res.json();
+            if (commits && commits.length > 0) {
+                return commits[0].commit.committer.date; // คืนค่า ISO timestamp ของ Git Commit ล่าสุด
+            }
+        }
+    } catch (err) {
+        console.error("⚠️ ไม่สามารถดึงวันที่ commit ล่าสุดได้:", err);
+    }
+    return null;
+}
+
 // ☁️ Fetch ไฟล์ข้อมูลกลางจาก GitHub (raw) — ทำงานทุกเครื่อง ทุก user
 async function loadLocalExcelFile(isSilent = false) {
     if (!isSilent) toggleLoader(true, "กำลังดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์กลาง...");
@@ -2210,19 +2235,31 @@ async function loadLocalExcelFile(isSilent = false) {
         document.getElementById('val-filesize').textContent = formatBytes(buffer.byteLength);
         document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
 
-        // แสดงเวลาที่ดึงข้อมูลมา
-        const now = new Date().toISOString();
-        appState.importTimestamp = now;
-        const formattedTime = new Date(now).toLocaleDateString('th-TH', {
-            year: 'numeric', month: 'long', day: 'numeric',
-            hour: '2-digit', minute: '2-digit', second: '2-digit'
-        }) + " น.";
+        // ดึงวันเวลานำเข้าข้อมูลจริงจากประวัติ Commit ล่าสุดของ GitHub
+        const commitDateStr = await getFileLastCommitDate();
+        let formattedTime = "";
+        
+        if (commitDateStr) {
+            appState.importTimestamp = commitDateStr;
+            formattedTime = new Date(commitDateStr).toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น. (Server)";
+        } else {
+            // fallback หากดึง API ไม่สำเร็จ
+            const now = new Date().toISOString();
+            appState.importTimestamp = now;
+            formattedTime = new Date(now).toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น. (Local)";
+        }
 
         const timeRow = document.getElementById('row-import-time');
         const timeVal = document.getElementById('val-import-time');
         if (timeRow && timeVal) {
             timeRow.style.display = 'flex';
-            timeVal.textContent = `ดึงข้อมูลจาก Server เมื่อ ${formattedTime}`;
+            timeVal.textContent = formattedTime;
         }
 
         const sheetSelect = document.getElementById('select-sheet');
