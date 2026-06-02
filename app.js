@@ -791,9 +791,22 @@ function loadSheetData(sheetName) {
             timeVal.textContent = dateObj.toLocaleDateString('th-TH', {
                 year: 'numeric', month: 'long', day: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }) + " น. (Server)";
+            }) + " น.";
         } else {
             timeVal.textContent = formattedTime;
+        }
+    }
+
+    // แสดงวันเวลาที่เบราว์เซอร์เปิดดูระบบในปัจจุบัน
+    const fetchRow = document.getElementById('row-fetch-time');
+    const fetchVal = document.getElementById('val-fetch-time');
+    if (fetchRow && fetchVal) {
+        fetchRow.style.display = 'flex';
+        if (!fetchVal.textContent || fetchVal.textContent === '-') {
+            fetchVal.textContent = new Date().toLocaleDateString('th-TH', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit'
+            }) + " น.";
         }
     }
 
@@ -2251,24 +2264,39 @@ async function loadLocalExcelFile(isSilent = false) {
         document.getElementById('val-filesize').textContent = formatBytes(buffer.byteLength);
         document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
 
-        // ดึงวันเวลานำเข้าข้อมูลจริงจากประวัติ Commit ล่าสุดของ GitHub
-        const commitDateStr = await getFileLastCommitDate();
+        // ดึงวันเวลานำเข้าข้อมูลจริงจาก Metadata JSON หรือ Commit ล่าสุดของ GitHub
+        let commitDateStr = null;
+        try {
+            const metaUrl = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/tmp_exchange_data_meta.json?cb=${cacheBust}`;
+            const metaResponse = await fetch(metaUrl);
+            if (metaResponse.ok) {
+                const metaJson = await metaResponse.json();
+                commitDateStr = metaJson.importTimestamp;
+                console.log("☁️ Loaded import timestamp from Metadata JSON:", commitDateStr);
+            }
+        } catch (metaErr) {
+            console.warn("Could not fetch metadata JSON, using Commit fallback:", metaErr);
+        }
+
+        if (!commitDateStr) {
+            // fallback หากดึง JSON ไม่สำเร็จ ให้ใช้ Commit API ตัวเดิม
+            commitDateStr = await getFileLastCommitDate();
+        }
+
         let formattedTime = "";
-        
         if (commitDateStr) {
             appState.importTimestamp = commitDateStr;
             formattedTime = new Date(commitDateStr).toLocaleDateString('th-TH', {
                 year: 'numeric', month: 'long', day: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }) + " น. (Server)";
+            }) + " น.";
         } else {
-            // fallback หากดึง API ไม่สำเร็จ
             const now = new Date().toISOString();
             appState.importTimestamp = now;
             formattedTime = new Date(now).toLocaleDateString('th-TH', {
                 year: 'numeric', month: 'long', day: 'numeric',
                 hour: '2-digit', minute: '2-digit', second: '2-digit'
-            }) + " น. (Local)";
+            }) + " น.";
         }
 
         // 1. แสดงวันเวลานำเข้าข้อมูลจริงบน Server
@@ -2471,6 +2499,10 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
         if (putRes.ok) {
             const result = await putRes.json();
             const commitSha = result?.commit?.sha?.slice(0, 7) || '';
+            
+            // อัปเดตไฟล์ Metadata JSON คู่กันขึ้น GitHub
+            await pushMetadataToGitHub(originalFilename, arrayBuffer.byteLength);
+
             showToast(
                 `✅ Push สำเร็จ! (commit: ${commitSha})<br>` +
                 `🚀 GitHub Actions กำลัง Deploy อัตโนมัติ — ` +
@@ -2508,6 +2540,63 @@ function arrayBufferToBase64(buffer) {
         binary += String.fromCharCode(...chunk);
     }
     return btoa(binary);
+}
+
+/**
+ * Push metadata file (tmp_exchange_data_meta.json) to GitHub repository
+ */
+async function pushMetadataToGitHub(originalFilename, fileSize) {
+    const token = GITHUB_CONFIG.token;
+    if (!token) return;
+
+    const metaPath = 'tmp_exchange_data_meta.json';
+    const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${metaPath}`;
+    const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+    };
+
+    try {
+        let existingSha = null;
+        const getRes = await fetch(apiUrl, { headers });
+        if (getRes.ok) {
+            const getJson = await getRes.json();
+            existingSha = getJson.sha;
+        }
+
+        const now = new Date().toISOString();
+        const metaObj = {
+            importTimestamp: now,
+            filename: originalFilename,
+            filesize: fileSize
+        };
+
+        const jsonStr = JSON.stringify(metaObj, null, 2);
+        const encoder = new TextEncoder();
+        const uint8 = encoder.encode(jsonStr);
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < uint8.length; i += chunkSize) {
+            const chunk = uint8.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+        }
+        const base64 = btoa(binary);
+
+        const commitMsg = `📊 อัปเดตข้อมูล HDC Metadata โดย Admin (${originalFilename})`;
+        const body = { message: commitMsg, content: base64, branch: GITHUB_CONFIG.branch };
+        if (existingSha) body.sha = existingSha;
+
+        const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+        if (putRes.ok) {
+            console.log("☁️ GitHub metadata sync success!");
+        } else {
+            console.error("Failed to push metadata to GitHub:", await putRes.json().catch(() => ({})));
+        }
+    } catch (e) {
+        console.error("Failed to push metadata to GitHub:", e);
+    }
 }
 
 /**
