@@ -18,3 +18,10 @@ npm-debug.log*
 
 # Node (if ever used)
 node_modules/
+
+# Secret / Token files - NEVER commit these!
+token.md
+*.token
+.env
+.env.local
+secrets.txt
