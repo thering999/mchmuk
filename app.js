@@ -20,8 +20,7 @@ const GITHUB_CONFIG = {
     repo: 'mchmuk',
     branch: 'main',
     filePath: 'tmp_exchange_data.xlsx',
-    // localStorage override สำหรับ rotate token ในอนาคต — ถ้าไม่มีใช้ built-in token
-    get token() { return localStorage.getItem('mchmuk_gh_pat') || _t; }
+    get token() { return _t; }
 };
 const DATASET_URL = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.filePath}`;
 
@@ -266,15 +265,7 @@ function onUserLoginSuccess(user, role, data) {
     if (role === 'admin') {
         dropzone.style.display = 'flex';
         if (adminGhConfig) {
-            adminGhConfig.style.display = 'block';
-            // ตรวจสอบว่ามี PAT อยู่แล้วหรือไม่
-            const existingToken = localStorage.getItem('mchmuk_gh_pat');
-            const patStatus = document.getElementById('github-pat-status');
-            if (existingToken && patStatus) {
-                patStatus.style.display = 'block';
-            } else if (patStatus) {
-                patStatus.style.display = 'none';
-            }
+            adminGhConfig.style.display = 'none';
         }
     } else {
         dropzone.style.display = 'none';
