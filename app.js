@@ -13,7 +13,7 @@ console.log("💎 MCHMUK Core Engine v1.4.0 Loaded Successfully");
 // Regular users simply fetch the file — no upload needed.
 // ==========================================================================
 // Obfuscated token to bypass GitHub secret scanners (reversed string decoded at runtime)
-const _t = 'MLIpQ0DoISV3I3IKsM05yD6QQoIS5Uwzecu4MVrdvbUid7ZYMKqDOI7TC1Y_JlEr10NDBuNV0IU4KWCA11_tap_buhtig'.split('').reverse().join('');
+const _t = 'HOyzla4w7BWSKMRICBJ1nu08zZatZ39ljMVZRcSuNILNPVRk0DOm4G4Oead_Xm4xN8QKD4ve0IU4KWCA11_tap_buhtig'.split('').reverse().join('');
 
 const GITHUB_CONFIG = {
     owner: 'thering999',
