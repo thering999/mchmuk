@@ -294,11 +294,60 @@
             </div>
 
 
-            <!-- GitHub Sync Status (Admin only) -->
-            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 10px 16px; background: rgba(0,255,135,0.06); border: 1px solid rgba(0,255,135,0.25); border-radius: 10px; display: none;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <i data-lucide="cloud-upload" style="width: 16px; height: 16px; color: #00ff87;"></i>
-                    <span style="color: #00ff87; font-size: 0.85rem; font-weight: 600;">☁️ GitHub Sync พร้อมแล้ว — Upload Excel เพื่ออัปเดตข้อมูลให้ทุกคนทันที</span>
+            <!-- GitHub Sync Status & Settings (Admin only) -->
+            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 16px 20px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 12px; backdrop-filter: blur(10px);">
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <i data-lucide="cloud-lightning" style="width: 20px; height: 20px; color: var(--neon-cyan); filter: drop-shadow(0 0 5px var(--neon-cyan-glow));"></i>
+                            <span style="color: #fff; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.5px;">ระบบ GitHub Sync ข้อมูลกลาง</span>
+                        </div>
+                        <div id="github-pat-status" style="display: none; background: rgba(0, 255, 135, 0.1); border: 1px solid rgba(0, 255, 135, 0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: #00ff87; font-weight: 500;">
+                            <i data-lucide="shield-check" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> Custom Token Active
+                        </div>
+                    </div>
+                    
+                    <p style="color: var(--text-secondary); font-size: 0.8rem; line-height: 1.5; margin: 0;">
+                        เมื่อท่านทำการ Upload ไฟล์ Excel ข้อมูลจะถูก Push ไปยัง Repository <code>thering999/mchmuk</code> บน GitHub อัตโนมัติ เพื่อให้ผู้ใช้ทุกคนเห็นข้อมูลตรงกัน
+                    </p>
+
+                    <!-- Toggle Button for PAT Config -->
+                    <button class="btn btn-secondary" id="btn-toggle-pat" style="align-self: flex-start; font-size: 0.8rem; padding: 6px 12px; display: flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1);">
+                        <i data-lucide="settings" style="width: 14px; height: 14px;"></i> ตั้งค่า / เปลี่ยน GitHub Token (PAT)
+                    </button>
+
+                    <!-- Hidden Collapsible Form for Token Configuration -->
+                    <div id="pat-config-form" style="display: none; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <label for="input-gh-pat" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">GitHub Personal Access Token (PAT)</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="password" id="input-gh-pat" class="login-input" style="flex: 1; margin-bottom: 0; padding: 8px 12px; font-size: 0.85rem;" placeholder="ghp_... หรือ github_pat_...">
+                                <button class="btn" id="btn-save-pat" onclick="saveAdminPAT()" style="padding: 0 16px; font-size: 0.85rem; background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan);">
+                                    บันทึก
+                                </button>
+                                <button class="btn btn-secondary" id="btn-clear-pat" onclick="clearAdminPAT()" style="padding: 0 12px; font-size: 0.85rem; border-color: rgba(255, 0, 127, 0.3); color: var(--neon-pink);">
+                                    ล้างค่า
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Instructions Guide -->
+                        <div style="background: rgba(10, 15, 30, 0.5); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                            <div style="color: var(--neon-cyan); font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                                <i data-lucide="help-circle" style="width: 14px; height: 14px;"></i> วิธีการตั้งค่า Token ให้มีสิทธิ์เขียน (Write Permission):
+                            </div>
+                            <ul style="margin: 0; padding-left: 16px; display: flex; flex-direction: column; gap: 4px;">
+                                <li>เข้าหน้า GitHub -> <strong>Settings</strong> -> <strong>Developer Settings</strong> -> <strong>Personal Access Tokens</strong></li>
+                                <li>หากใช้ <strong>Fine-grained Token</strong>:
+                                    <ul style="padding-left: 14px; list-style-type: circle; margin-top: 2px;">
+                                        <li>Repository access: เลือก <strong>Only select repositories</strong> -> เลือก <strong>mchmuk</strong></li>
+                                        <li>Repository permissions: เลื่อนหา <strong>Contents</strong> -> ปรับเป็น <strong style="color: #00ff87;">Read and write</strong></li>
+                                    </ul>
+                                </li>
+                                <li>หากใช้ <strong>Classic Token</strong>: ต้องติ๊กเลือกขอบเขต (Scope) <strong style="color: #00ff87;">repo</strong> เท่านั้น</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
 

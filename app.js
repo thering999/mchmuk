@@ -167,6 +167,20 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-submit-register').addEventListener('click', handleUserRegister);
     document.getElementById('btn-logout').addEventListener('click', handleUserLogout);
 
+    // Bind PAT Config Form toggle button
+    const btnTogglePat = document.getElementById('btn-toggle-pat');
+    const patConfigForm = document.getElementById('pat-config-form');
+    if (btnTogglePat && patConfigForm) {
+        btnTogglePat.addEventListener('click', () => {
+            const isHidden = patConfigForm.style.display === 'none';
+            patConfigForm.style.display = isHidden ? 'flex' : 'none';
+            btnTogglePat.innerHTML = isHidden 
+                ? '<i data-lucide="chevron-up"></i> ซ่อนเมนูตั้งค่า Token' 
+                : '<i data-lucide="settings"></i> ตั้งค่า / เปลี่ยน GitHub Token (PAT)';
+            lucide.createIcons();
+        });
+    }
+
     // Bind Login/Register Tab Toggles
     const tabLoginBtn = document.getElementById('tab-login-btn');
     const tabRegisterBtn = document.getElementById('tab-register-btn');
@@ -259,6 +273,8 @@ function onUserLoginSuccess(user, role, data) {
             const patStatus = document.getElementById('github-pat-status');
             if (existingToken && patStatus) {
                 patStatus.style.display = 'block';
+            } else if (patStatus) {
+                patStatus.style.display = 'none';
             }
         }
     } else {
@@ -2518,7 +2534,12 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
             if (putRes.status === 401) {
                 showToast('❌ Token ไม่ถูกต้องหรือหมดอายุ — กรุณาตั้งค่า GitHub Token ใหม่', 'error', 8000);
             } else if (putRes.status === 403) {
-                showToast('❌ Token ไม่มีสิทธิ์เขียน — ต้องมี scope: repo', 'error', 8000);
+                showToast(
+                    '❌ Token ไม่มีสิทธิ์เขียน — ต้องมีสิทธิ์ write เข้าคลังข้อมูล (Repository)<br>' +
+                    '<span style="font-size: 0.8rem; opacity: 0.9;">หากใช้ Fine-grained Token ต้องปรับ Repository Permissions -> <strong>Contents</strong> เป็น <strong>Read and write</strong> หรือหากใช้ Classic Token ต้องเลือก Scope: <strong>repo</strong></span>',
+                    'error',
+                    15000
+                );
             } else {
                 showToast(`❌ Push ไม่สำเร็จ (${putRes.status}): ${errMsg}`, 'error', 6000);
             }
@@ -2641,6 +2662,21 @@ function saveAdminPAT() {
     showToast('🔑 บันทึก GitHub Token สำเร็จ! ตอนนี้ Admin สามารถ Upload Excel เพื่อบันทึกข้อมูลไปยัง Server กลางได้เลย', 'success', 6000);
     console.log('✅ GitHub PAT saved successfully. Admin can now push Excel files to GitHub repo.');
     lucide.createIcons();
+}
+
+/**
+ * clearAdminPAT() — ล้างค่า Custom Token ใน LocalStorage
+ */
+function clearAdminPAT() {
+    localStorage.removeItem('mchmuk_gh_pat');
+    const input = document.getElementById('input-gh-pat');
+    if (input) input.value = '';
+
+    const patStatus = document.getElementById('github-pat-status');
+    if (patStatus) patStatus.style.display = 'none';
+
+    showToast('🔑 ล้างค่า GitHub Token แล้ว ระบบจะกลับไปใช้ Token เริ่มต้นของระบบ', 'info', 4000);
+    console.log('✅ Custom GitHub PAT cleared. Reverting to default.');
 }
 
 // Stub functions (ไม่ใช้ IndexedDB แล้ว)
