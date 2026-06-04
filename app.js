@@ -130,7 +130,6 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-export-json').addEventListener('click', exportJSON);
 
     // Bind Demo & Local Loader
-    document.getElementById('btn-demo-data').addEventListener('click', loadDemoData);
     document.getElementById('btn-load-local').addEventListener('click', loadLocalExcelFile);
 
     // Bind Age Tabs for MOPH Mode
@@ -2367,99 +2366,6 @@ async function loadLocalExcelFile(isSilent = false) {
     }
 }
 
-// Load highly complex dynamic Demo Data for demo/test visualization
-function loadDemoData() {
-    toggleLoader(true, "กำลังประมวลผลฐานข้อมูลจำลองระดับแกรนด์...");
-
-    // Generate beautiful business demo dataset (Sales / Regions / Date / Category)
-    const demoRows = [];
-    const categories = ['Electronics', 'Cosmetics', 'Grocery', 'Fashion', 'Home Decor', 'Sports'];
-    const regions = ['Bangkok', 'Chiang Mai', 'Phuket', 'Khon Kaen', 'Pattaya'];
-
-    const startDate = new Date(2025, 0, 1);
-
-    for (let i = 0; i < 500; i++) {
-        const currentDate = new Date(startDate.getTime() + (Math.floor(i / 10) * 24 * 60 * 60 * 1000));
-        const category = categories[Math.floor(Math.random() * categories.length)];
-        const region = regions[Math.floor(Math.random() * regions.length)];
-
-        let units = Math.floor(Math.random() * 45) + 5;
-        let basePrice = 0;
-        switch (category) {
-            case 'Electronics': basePrice = 850; break;
-            case 'Cosmetics': basePrice = 280; break;
-            case 'Grocery': basePrice = 90; break;
-            case 'Fashion': basePrice = 420; break;
-            case 'Home Decor': basePrice = 650; break;
-            case 'Sports': basePrice = 550; break;
-        }
-
-        const revenue = units * basePrice * (0.85 + Math.random() * 0.3);
-        const rating = parseFloat((3.5 + Math.random() * 1.5).toFixed(1));
-
-        demoRows.push({
-            'ลำดับ': i + 1,
-            'วันที่สั่งซื้อ': currentDate,
-            'ภูมิภาค': region,
-            'หมวดหมู่สินค้า': category,
-            'จำนวนสินค้า (ชิ้น)': units,
-            'ยอดขายสุทธิ (บาท)': parseFloat(revenue.toFixed(2)),
-            'คะแนนความพอใจ': rating
-        });
-    }
-
-    appState.workbook = {
-        SheetNames: ['แดชบอร์ดจำลองฝ่ายขาย', 'รายการสินค้าคงคลัง'],
-        Sheets: { 'แดชบอร์ดจำลองฝ่ายขาย': {}, 'รายการสินค้าคงคลัง': {} }
-    };
-    appState.sheetNames = appState.workbook.SheetNames;
-
-    document.getElementById('val-filename').textContent = "Virtual_Sales_Demo_Database.xlsx";
-    document.getElementById('val-filesize').textContent = "Virtual Stream (340 KB)";
-    document.getElementById('val-sheets').textContent = 2;
-
-    const sheetSelect = document.getElementById('select-sheet');
-    sheetSelect.innerHTML = '';
-    appState.sheetNames.forEach(sheetName => {
-        const opt = document.createElement('option');
-        opt.value = sheetName;
-        opt.textContent = sheetName;
-        sheetSelect.appendChild(opt);
-    });
-
-    appState.rawData = demoRows;
-    appState.filteredData = [...demoRows];
-
-    const headerSet = new Set();
-    demoRows.forEach(row => {
-        Object.keys(row).forEach(key => headerSet.add(key));
-    });
-    appState.headers = Array.from(headerSet);
-
-    analyzeColumnTypes();
-    detectMophIronDataset(); // Should be false
-    populateDimensionSelects();
-
-    appState.xAxisCol = 'วันที่สั่งซื้อ';
-    appState.yAxisCol = 'ยอดขายสุทธิ (บาท)';
-    appState.groupByCol = 'ภูมิภาค';
-    appState.aggregateFn = 'SUM';
-
-    document.getElementById('select-x-axis').value = appState.xAxisCol;
-    document.getElementById('select-y-axis').value = appState.yAxisCol;
-    document.getElementById('select-group-by').value = appState.groupByCol;
-    document.getElementById('select-aggregate').value = appState.aggregateFn;
-
-    document.getElementById('welcome-message').style.display = 'none';
-    document.getElementById('panel-dimensions').style.display = 'block';
-    document.getElementById('dashboard-content').style.display = 'flex';
-
-    document.getElementById('val-status').textContent = "ตัวอย่างออนไลน์";
-    document.getElementById('val-status').className = "status-badge success";
-
-    triggerAnalyticsUpdate();
-    toggleLoader(false);
-}
 
 // ==========================================================================
 // ☁️ GitHub API — Central Data Persistence Engine
