@@ -63,8 +63,8 @@ let charts = {
     radar: null
 };
 
-// --- Neon Theme Color Palette ---
-const neonColors = ['#00f2fe', '#9d4edd', '#ff007f', '#00ff87', '#ffb300', '#007eff', '#ff6b6b'];
+// --- Health/Government Theme Color Palette ---
+const neonColors = ['#0284c7', '#16a34a', '#dc2626', '#0d9488', '#f59e0b', '#6366f1', '#65a30d'];
 
 // --- Helper to verify if a hospital code/name belongs to a public MOPH service unit in Mukdahan (excluding clinics/private hospitals) ---
 function isPublicMophHospital(code, name) {
@@ -487,8 +487,8 @@ function showToast(message, type = 'info', duration = 4000) {
 
     const colors = {
         success: { border: '#00ff87', bg: 'rgba(0,255,135,0.12)', icon: '✅' },
-        error:   { border: '#ff007f', bg: 'rgba(255,0,127,0.12)', icon: '❌' },
-        info:    { border: '#00b8d4', bg: 'rgba(0,184,212,0.12)', icon: '📊' },
+        error:   { border: '#dc2626', bg: 'rgba(220,38,38,0.12)', icon: '❌' },
+        info:    { border: '#0284c7', bg: 'rgba(2,132,199,0.12)', icon: '📊' },
         warn:    { border: '#ffb300', bg: 'rgba(255,179,0,0.12)', icon: '⚠️' }
     };
     const c = colors[type] || colors.info;
@@ -1459,7 +1459,7 @@ function renderMophModeCharts(rows) {
             toolbar: { show: false }
         },
         theme: { mode: 'light' },
-        colors: ['#00f2fe', '#9d4edd'], // Cyan for Supplement, Purple for HCT Screening!
+        colors: ['#0284c7', '#16a34a'], // Blue for Supplement, Green for HCT Screening
         plotOptions: {
             bar: {
                 horizontal: true,
@@ -1525,7 +1525,7 @@ function renderMophModeCharts(rows) {
             foreColor: '#475569'
         },
         theme: { mode: 'light' },
-        colors: ['#00ff87', '#ff007f', 'rgba(100,116,139,0.3)'], // Cyan-Green = Normal, Cyber Pink = Anemic, Dark Gray = Not tested
+        colors: ['#16a34a', '#dc2626', 'rgba(100,116,139,0.3)'], // Green = Normal, Red = Anemic, Gray = Not tested
         labels: ['เจาะแล้วปกติ (Normal HCT)', 'เจาะแล้วซีด (Anemic HCT)', 'ยังไม่เจาะ Lab HCT'],
         plotOptions: {
             pie: {
@@ -1609,12 +1609,12 @@ function renderMophModeCharts(rows) {
                 top: 3,
                 left: 0,
                 blur: 5,
-                color: '#9d4edd',
+                color: '#16a34a',
                 opacity: 0.25
             }
         },
         theme: { mode: 'light' },
-        colors: ['#9d4edd', '#00f2fe'], // Purple for Supplement, Cyan for HCT Lab
+        colors: ['#16a34a', '#0284c7'], // Green for Supplement, Blue for HCT Lab
         fill: {
             type: 'gradient',
             gradient: {
@@ -1693,7 +1693,7 @@ function renderMophModeCharts(rows) {
             toolbar: { show: false }
         },
         theme: { mode: 'light' },
-        colors: ['#ff007f'], // Cyber pink for clinical indicators
+        colors: ['#dc2626'], // Red for clinical indicators
         plotOptions: {
             bar: {
                 columnWidth: '40%',
@@ -1705,7 +1705,7 @@ function renderMophModeCharts(rows) {
             enabled: true,
             formatter: function (val) { return val + "%"; },
             offsetY: -20,
-            style: { fontSize: '11px', colors: ["#ff007f"] }
+            style: { fontSize: '11px', colors: ["#dc2626"] }
         },
         xaxis: {
             categories: ['กลุ่มที่ได้รับธาตุเหล็ก', 'กลุ่มที่ไม่ได้รับธาตุเหล็ก'],
@@ -2007,9 +2007,9 @@ function renderTable() {
                 } else if (header === 'anemea' && appState.isMophMode) {
                     const anemiaVal = cleanNumericValue(val);
                     if (anemiaVal === 2) {
-                        td.innerHTML = `<span class="status-badge pending" style="background: rgba(255, 0, 127, 0.1); color: var(--neon-pink); border-color: var(--neon-pink); font-size: 0.7rem; padding: 2px 6px;">โลหิตจาง</span>`;
+                        td.innerHTML = `<span class="status-badge pending" style="background: rgba(220, 38, 38, 0.1); color: var(--neon-pink); border-color: var(--neon-pink); font-size: 0.7rem; padding: 2px 6px;">โลหิตจาง</span>`;
                     } else if (anemiaVal === 0) {
-                        td.innerHTML = `<span class="status-badge success" style="background: rgba(0, 184, 212, 0.08); color: var(--text-secondary); border-color: transparent; font-size: 0.7rem; padding: 2px 6px;">ปกติ</span>`;
+                        td.innerHTML = `<span class="status-badge success" style="background: rgba(2, 132, 199, 0.08); color: var(--text-secondary); border-color: transparent; font-size: 0.7rem; padding: 2px 6px;">ปกติ</span>`;
                     } else {
                         td.textContent = String(val);
                     }
@@ -2419,7 +2419,7 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
             showToast(
                 `✅ Push สำเร็จ! (commit: ${commitSha})<br>` +
                 `🚀 GitHub Actions กำลัง Deploy อัตโนมัติ — ` +
-                `<a href="${actionsUrl}" target="_blank" style="color:#00ff87;text-decoration:underline;">ดู Actions →</a><br>` +
+                `<a href="${actionsUrl}" target="_blank" style="color:#0284c7;text-decoration:underline;">ดู Actions →</a><br>` +
                 `⏱️ ผู้ใช้ทุกคนจะเห็นข้อมูลใหม่ภายใน ~1-2 นาที`,
                 'success', 10000
             );

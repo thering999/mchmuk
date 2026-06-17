@@ -11,8 +11,8 @@
     <style>
         /* --- Specialized Custom Styles for HDC MOPH Mode --- */
         .moph-alert-banner {
-            background: linear-gradient(90deg, rgba(0, 184, 212, 0.1) 0%, rgba(157, 78, 221, 0.15) 100%);
-            border: 1px solid rgba(0, 184, 212, 0.3);
+            background: linear-gradient(90deg, rgba(2, 132, 199, 0.1) 0%, rgba(22, 163, 74, 0.15) 100%);
+            border: 1px solid rgba(2, 132, 199, 0.3);
             border-radius: var(--border-radius-md);
             padding: 16px 20px;
             display: flex;
@@ -22,7 +22,7 @@
             margin-bottom: 8px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 15px rgba(0, 184, 212, 0.05);
+            box-shadow: 0 0 15px rgba(2, 132, 199, 0.05);
         }
         .moph-alert-banner::before {
             content: '';
@@ -42,7 +42,7 @@
         .moph-alert-icon {
             width: 38px;
             height: 38px;
-            background: rgba(0, 184, 212, 0.15);
+            background: rgba(2, 132, 199, 0.15);
             color: var(--neon-cyan);
             border-radius: 50%;
             display: flex;
@@ -62,7 +62,7 @@
             color: var(--text-secondary);
         }
         .target-badge {
-            background: rgba(255, 0, 127, 0.15);
+            background: rgba(220, 38, 38, 0.15);
             color: var(--neon-pink);
             border: 1px solid var(--neon-pink);
             padding: 6px 12px;
@@ -105,7 +105,7 @@
             border-color: var(--neon-cyan);
         }
         .filter-tab-btn.active {
-            background: linear-gradient(135deg, rgba(0, 184, 212, 0.2) 0%, rgba(157, 78, 221, 0.2) 100%);
+            background: linear-gradient(135deg, rgba(2, 132, 199, 0.2) 0%, rgba(22, 163, 74, 0.2) 100%);
             border-color: var(--neon-cyan);
             color: var(--neon-cyan);
             box-shadow: 0 0 10px var(--neon-cyan-glow);
@@ -127,7 +127,7 @@
             z-index: 10;
             border-radius: 16px;
             border: 1px dashed var(--neon-pink);
-            box-shadow: 0 0 30px rgba(255, 0, 127, 0.1) inset;
+            box-shadow: 0 0 30px rgba(220, 38, 38, 0.1) inset;
         }
         .pdpa-lock-content {
             text-align: center;
@@ -157,7 +157,7 @@
         .pdpa-unlock-btn {
             background: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-purple) 100%) !important;
             border-color: var(--neon-pink) !important;
-            box-shadow: 0 0 15px rgba(255, 0, 127, 0.4) !important;
+            box-shadow: 0 0 15px rgba(220, 38, 38, 0.4) !important;
         }
     </style>
 </head>
@@ -217,7 +217,7 @@
                         <label for="register-password">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label>
                         <input type="password" id="register-password" class="login-input" placeholder="••••••••" required>
                     </div>
-                    <button type="submit" class="btn login-submit-btn" id="btn-submit-register" style="background: linear-gradient(135deg, var(--neon-purple) 0%, var(--neon-pink) 100%); border-color: var(--neon-purple); box-shadow: 0 0 15px rgba(157, 78, 221, 0.4);">
+                    <button type="submit" class="btn login-submit-btn" id="btn-submit-register" style="background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%); border-color: var(--neon-purple); box-shadow: 0 0 15px rgba(22, 163, 74, 0.4);">
                         <i data-lucide="user-plus"></i> สมัครสมาชิกเข้าระบบ
                     </button>
                 </form>
@@ -251,7 +251,7 @@
                     </button>
                 </div>
                 <!-- Guest Mode Login Button -->
-                <button class="btn" id="btn-header-login" style="background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 184, 212, 0.3);">
+                <button class="btn" id="btn-header-login" style="background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(2, 132, 199, 0.3);">
                     <i data-lucide="log-in"></i> เข้าสู่ระบบ (Sign In)
                 </button>
                 <button class="btn btn-secondary" id="btn-load-local" style="display: none;">
@@ -295,7 +295,7 @@
 
 
             <!-- GitHub Sync Status & Settings (Admin only) -->
-            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 16px 20px; background: rgba(241, 245, 249, 0.7); border: 1px solid rgba(0, 184, 212, 0.25); border-radius: 12px; backdrop-filter: blur(10px);">
+            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 16px 20px; background: rgba(241, 245, 249, 0.7); border: 1px solid rgba(2, 132, 199, 0.25); border-radius: 12px; backdrop-filter: blur(10px);">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
@@ -325,7 +325,7 @@
                                 <button class="btn" id="btn-save-pat" onclick="saveAdminPAT()" style="padding: 0 16px; font-size: 0.85rem; background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan);">
                                     บันทึก
                                 </button>
-                                <button class="btn btn-secondary" id="btn-clear-pat" onclick="clearAdminPAT()" style="padding: 0 12px; font-size: 0.85rem; border-color: rgba(255, 0, 127, 0.3); color: var(--neon-pink);">
+                                <button class="btn btn-secondary" id="btn-clear-pat" onclick="clearAdminPAT()" style="padding: 0 12px; font-size: 0.85rem; border-color: rgba(220, 38, 38, 0.3); color: var(--neon-pink);">
                                     ล้างค่า
                                 </button>
                             </div>
@@ -484,7 +484,7 @@
                     <span style="color: var(--neon-purple); font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
                         <i data-lucide="map-pin" style="width: 18px; height: 18px;"></i> กรองรายอำเภอ:
                     </span>
-                    <select id="select-district" class="form-select" style="min-width: 160px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--neon-purple); color: var(--text-primary); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(157, 78, 221, 0.15); font-family: var(--font-main);">
+                    <select id="select-district" class="form-select" style="min-width: 160px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--neon-purple); color: var(--text-primary); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(22, 163, 74, 0.15); font-family: var(--font-main);">
                         <option value="all">🗺️ ทุกอำเภอ (ทั้งหมด)</option>
                     </select>
                 </div>
@@ -494,7 +494,7 @@
                     <span style="color: var(--neon-cyan); font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
                         <i data-lucide="building-2" style="width: 18px; height: 18px;"></i> กรองหน่วยบริการ:
                     </span>
-                    <select id="select-hospital" class="form-select" style="max-width: 320px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--neon-cyan); color: var(--text-primary); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(0, 184, 212, 0.15); font-family: var(--font-main);">
+                    <select id="select-hospital" class="form-select" style="max-width: 320px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--neon-cyan); color: var(--text-primary); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(2, 132, 199, 0.15); font-family: var(--font-main);">
                         <option value="all">🏥 ทุกหน่วยบริการ (ทั้งหมด)</option>
                     </select>
                 </div>

@@ -1,44 +1,44 @@
 /* ==========================================================================
-   💎 GRANDEUR CYBER-NEON DESIGN SYSTEM
-   Custom Vanilla CSS for Premium, High-Dimensional Dashboard Interfaces
+   🏥 MCHMUK HEALTH DASHBOARD DESIGN SYSTEM
+   Bright, clean blue/green theme for public health data dashboards
    ========================================================================== */
 
 /* --- Import Google Fonts --- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
 
 /* --- Design Tokens / Custom Variables --- */
 :root {
     /* Color Palette */
-    --bg-darker: #eef2fb;
-    --bg-dark: #f7f9fd;
-    --bg-card: rgba(255, 255, 255, 0.75);
-    --bg-card-hover: rgba(255, 255, 255, 0.95);
+    --bg-darker: #eef6f5;
+    --bg-dark: #f5fbfa;
+    --bg-card: rgba(255, 255, 255, 0.8);
+    --bg-card-hover: rgba(255, 255, 255, 0.98);
     --ink: #0f172a;
 
-    /* Neon Glow Accents */
-    --neon-cyan: #00b8d4;
-    --neon-cyan-glow: rgba(0, 184, 212, 0.3);
-    --neon-purple: #9d4edd;
-    --neon-purple-glow: rgba(157, 78, 221, 0.3);
-    --neon-pink: #ff007f;
-    --neon-pink-glow: rgba(255, 0, 127, 0.3);
+    /* Health/Government Accents: Blue (primary), Green (secondary), Red (alerts) */
+    --neon-cyan: #0284c7;
+    --neon-cyan-glow: rgba(2, 132, 199, 0.3);
+    --neon-purple: #16a34a;
+    --neon-purple-glow: rgba(22, 163, 74, 0.3);
+    --neon-pink: #dc2626;
+    --neon-pink-glow: rgba(220, 38, 38, 0.3);
 
     /* Text Colors */
     --text-primary: #1e293b;
     --text-secondary: #475569;
     --text-muted: #64748b;
-    --text-cyan: #0891b2;
+    --text-cyan: #0369a1;
 
     /* UI Scale & Borders */
-    --border-glow: rgba(0, 184, 212, 0.25);
-    --border-glow-purple: rgba(157, 78, 221, 0.25);
+    --border-glow: rgba(2, 132, 199, 0.25);
+    --border-glow-purple: rgba(22, 163, 74, 0.25);
     --border-light: rgba(15, 23, 42, 0.08);
     --border-radius-lg: 16px;
     --border-radius-md: 10px;
     --border-radius-sm: 6px;
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-    --font-display: 'Orbitron', var(--font-sans);
+    --font-display: 'Inter', var(--font-sans);
 }
 
 /* --- Base Reset --- */
@@ -52,8 +52,8 @@ body {
     background-color: var(--bg-darker);
     background-image:
         radial-gradient(at 0% 0%, rgba(186, 230, 253, 0.6) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(233, 213, 255, 0.5) 0px, transparent 50%),
-        radial-gradient(at 50% 100%, rgba(252, 207, 233, 0.45) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(187, 247, 208, 0.55) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(224, 242, 254, 0.5) 0px, transparent 50%),
         linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
         linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
     background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
@@ -73,7 +73,7 @@ body {
     background: var(--bg-darker);
 }
 ::-webkit-scrollbar-thumb {
-    background: rgba(157, 78, 221, 0.2);
+    background: rgba(22, 163, 74, 0.2);
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -103,7 +103,7 @@ header {
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-glow);
     border-radius: var(--border-radius-lg);
-    box-shadow: 0 0 25px rgba(0, 184, 212, 0.08);
+    box-shadow: 0 0 25px rgba(2, 132, 199, 0.08);
     position: relative;
     overflow: hidden;
 }
@@ -197,7 +197,7 @@ header::before {
 .dropzone-card:hover, .dropzone-card.dragover {
     border-color: var(--neon-cyan);
     background: var(--bg-card-hover);
-    box-shadow: 0 0 20px rgba(0, 184, 212, 0.15);
+    box-shadow: 0 0 20px rgba(2, 132, 199, 0.15);
 }
 
 .dropzone-icon {
@@ -229,7 +229,7 @@ header::before {
 }
 
 .btn {
-    background: linear-gradient(135deg, rgba(0, 184, 212, 0.15) 0%, rgba(157, 78, 221, 0.15) 100%);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(22, 163, 74, 0.15) 100%);
     border: 1px solid var(--neon-cyan);
     color: var(--neon-cyan);
     padding: 10px 24px;
@@ -261,8 +261,8 @@ header::before {
 }
 
 .btn-secondary:hover {
-    background: linear-gradient(135deg, var(--neon-purple) 0%, var(--neon-pink) 100%);
-    color: var(--text-primary);
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+    color: var(--ink);
     box-shadow: 0 0 18px var(--neon-purple-glow);
 }
 
@@ -289,7 +289,7 @@ header::before {
     right: 0;
     width: 60px;
     height: 60px;
-    background: radial-gradient(circle, rgba(157, 78, 221, 0.15) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(22, 163, 74, 0.15) 0%, transparent 70%);
 }
 
 .info-row {
@@ -336,7 +336,7 @@ header::before {
 }
 
 .status-badge.success {
-    background: rgba(0, 184, 212, 0.15);
+    background: rgba(2, 132, 199, 0.15);
     color: var(--neon-cyan);
     border: 1px solid var(--neon-cyan);
     box-shadow: 0 0 10px var(--neon-cyan-glow);
@@ -350,7 +350,7 @@ header::before {
     border: 1px solid var(--border-glow-purple);
     border-radius: var(--border-radius-lg);
     padding: 24px;
-    box-shadow: 0 0 25px rgba(157, 78, 221, 0.08);
+    box-shadow: 0 0 25px rgba(22, 163, 74, 0.08);
 }
 
 .panel-title {
@@ -449,17 +449,17 @@ header::before {
 
 .kpi-card.cyan:hover {
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 20px rgba(0, 184, 212, 0.15);
+    box-shadow: 0 0 20px rgba(2, 132, 199, 0.15);
 }
 
 .kpi-card.purple:hover {
     border-color: var(--neon-purple);
-    box-shadow: 0 0 20px rgba(157, 78, 221, 0.15);
+    box-shadow: 0 0 20px rgba(22, 163, 74, 0.15);
 }
 
 .kpi-card.pink:hover {
     border-color: var(--neon-pink);
-    box-shadow: 0 0 20px rgba(255, 0, 127, 0.15);
+    box-shadow: 0 0 20px rgba(220, 38, 38, 0.15);
 }
 
 .kpi-header {
@@ -486,17 +486,17 @@ header::before {
 }
 
 .kpi-card.cyan .kpi-icon {
-    background: rgba(0, 184, 212, 0.1);
+    background: rgba(2, 132, 199, 0.1);
     color: var(--neon-cyan);
 }
 
 .kpi-card.purple .kpi-icon {
-    background: rgba(157, 78, 221, 0.1);
+    background: rgba(22, 163, 74, 0.1);
     color: var(--neon-purple);
 }
 
 .kpi-card.pink .kpi-icon {
-    background: rgba(255, 0, 127, 0.1);
+    background: rgba(220, 38, 38, 0.1);
     color: var(--neon-pink);
 }
 
@@ -806,7 +806,7 @@ tr:hover {
     border-bottom-color: var(--neon-purple);
     border-radius: 50%;
     animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    box-shadow: 0 0 20px rgba(0, 184, 212, 0.2);
+    box-shadow: 0 0 20px rgba(2, 132, 199, 0.2);
     position: relative;
 }
 
@@ -836,10 +836,10 @@ tr:hover {
 /* --- Keyframe Animations --- */
 @keyframes pulseGlow {
     from {
-        box-shadow: 0 0 10px rgba(0, 184, 212, 0.3);
+        box-shadow: 0 0 10px rgba(2, 132, 199, 0.3);
     }
     to {
-        box-shadow: 0 0 25px rgba(0, 184, 212, 0.7), 0 0 10px rgba(157, 78, 221, 0.5);
+        box-shadow: 0 0 25px rgba(2, 132, 199, 0.7), 0 0 10px rgba(22, 163, 74, 0.5);
     }
 }
 
@@ -915,7 +915,7 @@ footer a:hover {
 .login-card {
     background: rgba(255, 255, 255, 0.9);
     border: 1px solid var(--neon-cyan);
-    box-shadow: 0 0 30px rgba(0, 184, 212, 0.2), inset 0 0 15px rgba(0, 184, 212, 0.05);
+    box-shadow: 0 0 30px rgba(2, 132, 199, 0.2), inset 0 0 15px rgba(2, 132, 199, 0.05);
     border-radius: var(--border-radius-lg);
     width: 100%;
     max-width: 420px;
@@ -1015,7 +1015,7 @@ footer a:hover {
 }
 
 .login-error {
-    background: rgba(255, 0, 127, 0.1);
+    background: rgba(220, 38, 38, 0.1);
     border: 1px solid var(--neon-pink);
     color: var(--neon-pink);
     padding: 10px 14px;
@@ -1024,7 +1024,7 @@ footer a:hover {
     display: none;
     align-items: center;
     gap: 8px;
-    box-shadow: 0 0 10px rgba(255, 0, 127, 0.15);
+    box-shadow: 0 0 10px rgba(220, 38, 38, 0.15);
 }
 
 .login-submit-btn {
@@ -1054,11 +1054,11 @@ footer a:hover {
     width: 28px;
     height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, var(--neon-purple), var(--neon-pink));
+    background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--text-primary);
+    color: var(--ink);
     font-weight: bold;
     font-size: 0.75rem;
     box-shadow: 0 0 8px var(--neon-purple-glow);
@@ -1097,7 +1097,7 @@ footer a:hover {
 
 .btn-logout:hover {
     color: var(--neon-pink);
-    background: rgba(255, 0, 127, 0.1);
+    background: rgba(220, 38, 38, 0.1);
 }
 
 /* Database Batch Selector styles */
@@ -1142,9 +1142,9 @@ footer a:hover {
 }
 
 .batch-item.active {
-    background: rgba(0, 184, 212, 0.05);
+    background: rgba(2, 132, 199, 0.05);
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 10px rgba(0, 184, 212, 0.1);
+    box-shadow: 0 0 10px rgba(2, 132, 199, 0.1);
 }
 
 .batch-meta-info {
@@ -1170,9 +1170,9 @@ footer a:hover {
 }
 
 .batch-badge {
-    background: rgba(0, 184, 212, 0.1);
+    background: rgba(2, 132, 199, 0.1);
     color: var(--neon-cyan);
-    border: 1px solid rgba(0, 184, 212, 0.2);
+    border: 1px solid rgba(2, 132, 199, 0.2);
     font-size: 0.7rem;
     padding: 2px 8px;
     border-radius: 12px;
