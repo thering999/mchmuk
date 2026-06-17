@@ -11,8 +11,8 @@
     <style>
         /* --- Specialized Custom Styles for HDC MOPH Mode --- */
         .moph-alert-banner {
-            background: linear-gradient(90deg, rgba(0, 242, 254, 0.1) 0%, rgba(157, 78, 221, 0.15) 100%);
-            border: 1px solid rgba(0, 242, 254, 0.3);
+            background: linear-gradient(90deg, rgba(0, 184, 212, 0.1) 0%, rgba(157, 78, 221, 0.15) 100%);
+            border: 1px solid rgba(0, 184, 212, 0.3);
             border-radius: var(--border-radius-md);
             padding: 16px 20px;
             display: flex;
@@ -22,7 +22,7 @@
             margin-bottom: 8px;
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 15px rgba(0, 242, 254, 0.05);
+            box-shadow: 0 0 15px rgba(0, 184, 212, 0.05);
         }
         .moph-alert-banner::before {
             content: '';
@@ -42,7 +42,7 @@
         .moph-alert-icon {
             width: 38px;
             height: 38px;
-            background: rgba(0, 242, 254, 0.15);
+            background: rgba(0, 184, 212, 0.15);
             color: var(--neon-cyan);
             border-radius: 50%;
             display: flex;
@@ -75,8 +75,8 @@
         }
         .target-badge.met {
             background: rgba(0, 255, 135, 0.15);
-            color: #00ff87;
-            border: 1px solid #00ff87;
+            color: #15803d;
+            border: 1px solid #15803d;
             box-shadow: 0 0 10px rgba(0, 255, 135, 0.3);
         }
         
@@ -87,7 +87,7 @@
             margin-bottom: 20px;
         }
         .filter-tab-btn {
-            background: rgba(11, 15, 25, 0.8);
+            background: rgba(255, 255, 255, 0.6);
             border: 1px solid var(--border-light);
             color: var(--text-secondary);
             padding: 8px 16px;
@@ -105,7 +105,7 @@
             border-color: var(--neon-cyan);
         }
         .filter-tab-btn.active {
-            background: linear-gradient(135deg, rgba(0, 242, 254, 0.2) 0%, rgba(157, 78, 221, 0.2) 100%);
+            background: linear-gradient(135deg, rgba(0, 184, 212, 0.2) 0%, rgba(157, 78, 221, 0.2) 100%);
             border-color: var(--neon-cyan);
             color: var(--neon-cyan);
             box-shadow: 0 0 10px var(--neon-cyan-glow);
@@ -175,7 +175,7 @@
             </div>
 
             <!-- Tabs Toggle -->
-            <div class="login-tabs" style="display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+            <div class="login-tabs" style="display: flex; gap: 10px; margin-bottom: 24px; border-bottom: 1px solid rgba(15,23,42,0.1); padding-bottom: 12px;">
                 <button class="login-tab-btn active" id="tab-login-btn" style="flex: 1; background: transparent; border: none; color: var(--neon-cyan); font-weight: bold; cursor: pointer; font-size: 0.95rem; text-align: center; padding: 6px 0; transition: all 0.3s; border-bottom: 2px solid var(--neon-cyan);">เข้าสู่ระบบ</button>
                 <button class="login-tab-btn" id="tab-register-btn" style="flex: 1; background: transparent; border: none; color: var(--text-muted); font-weight: normal; cursor: pointer; font-size: 0.95rem; text-align: center; padding: 6px 0; transition: all 0.3s; border-bottom: 2px solid transparent;">สมัครใช้งานใหม่</button>
             </div>
@@ -251,7 +251,7 @@
                     </button>
                 </div>
                 <!-- Guest Mode Login Button -->
-                <button class="btn" id="btn-header-login" style="background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);">
+                <button class="btn" id="btn-header-login" style="background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-blue) 100%); border-color: var(--neon-cyan); box-shadow: 0 0 10px rgba(0, 184, 212, 0.3);">
                     <i data-lucide="log-in"></i> เข้าสู่ระบบ (Sign In)
                 </button>
                 <button class="btn btn-secondary" id="btn-load-local" style="display: none;">
@@ -295,14 +295,14 @@
 
 
             <!-- GitHub Sync Status & Settings (Admin only) -->
-            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 16px 20px; background: rgba(30, 41, 59, 0.4); border: 1px solid rgba(0, 242, 254, 0.2); border-radius: 12px; backdrop-filter: blur(10px);">
+            <div id="admin-github-config" style="display: none; margin-top: 12px; padding: 16px 20px; background: rgba(241, 245, 249, 0.7); border: 1px solid rgba(0, 184, 212, 0.25); border-radius: 12px; backdrop-filter: blur(10px);">
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
                         <div style="display: flex; align-items: center; gap: 10px;">
                             <i data-lucide="cloud-lightning" style="width: 20px; height: 20px; color: var(--neon-cyan); filter: drop-shadow(0 0 5px var(--neon-cyan-glow));"></i>
-                            <span style="color: #fff; font-size: 0.9rem; font-weight: 600; letter-spacing: 0.5px;">ระบบ GitHub Sync ข้อมูลกลาง</span>
+                            <span style="color: var(--text-primary); font-size: 0.9rem; font-weight: 600; letter-spacing: 0.5px;">ระบบ GitHub Sync ข้อมูลกลาง</span>
                         </div>
-                        <div id="github-pat-status" style="display: none; background: rgba(0, 255, 135, 0.1); border: 1px solid rgba(0, 255, 135, 0.3); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: #00ff87; font-weight: 500;">
+                        <div id="github-pat-status" style="display: none; background: rgba(0, 255, 135, 0.12); border: 1px solid rgba(21, 128, 61, 0.4); padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; color: #15803d; font-weight: 500;">
                             <i data-lucide="shield-check" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i> Custom Token Active
                         </div>
                     </div>
@@ -312,12 +312,12 @@
                     </p>
 
                     <!-- Toggle Button for PAT Config -->
-                    <button class="btn btn-secondary" id="btn-toggle-pat" style="align-self: flex-start; font-size: 0.8rem; padding: 6px 12px; display: flex; align-items: center; gap: 6px; background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1);">
+                    <button class="btn btn-secondary" id="btn-toggle-pat" style="align-self: flex-start; font-size: 0.8rem; padding: 6px 12px; display: flex; align-items: center; gap: 6px; background: rgba(15, 23, 42, 0.04); border-color: rgba(15, 23, 42, 0.12);">
                         <i data-lucide="settings" style="width: 14px; height: 14px;"></i> ตั้งค่า / เปลี่ยน GitHub Token (PAT)
                     </button>
 
                     <!-- Hidden Collapsible Form for Token Configuration -->
-                    <div id="pat-config-form" style="display: none; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08);">
+                    <div id="pat-config-form" style="display: none; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(15, 23, 42, 0.1);">
                         <div style="display: flex; flex-direction: column; gap: 6px;">
                             <label for="input-gh-pat" style="font-size: 0.8rem; color: var(--text-secondary); font-weight: 600;">GitHub Personal Access Token (PAT)</label>
                             <div style="display: flex; gap: 8px;">
@@ -332,7 +332,7 @@
                         </div>
 
                         <!-- Instructions Guide -->
-                        <div style="background: rgba(10, 15, 30, 0.5); border: 1px dashed rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 12px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
+                        <div style="background: rgba(15, 23, 42, 0.04); border: 1px dashed rgba(15, 23, 42, 0.15); border-radius: 8px; padding: 12px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.6;">
                             <div style="color: var(--neon-cyan); font-weight: bold; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
                                 <i data-lucide="help-circle" style="width: 14px; height: 14px;"></i> วิธีการตั้งค่า Token ให้มีสิทธิ์เขียน (Write Permission):
                             </div>
@@ -341,10 +341,10 @@
                                 <li>หากใช้ <strong>Fine-grained Token</strong>:
                                     <ul style="padding-left: 14px; list-style-type: circle; margin-top: 2px;">
                                         <li>Repository access: เลือก <strong>Only select repositories</strong> -> เลือก <strong>mchmuk</strong></li>
-                                        <li>Repository permissions: เลื่อนหา <strong>Contents</strong> -> ปรับเป็น <strong style="color: #00ff87;">Read and write</strong></li>
+                                        <li>Repository permissions: เลื่อนหา <strong>Contents</strong> -> ปรับเป็น <strong style="color: #15803d;">Read and write</strong></li>
                                     </ul>
                                 </li>
-                                <li>หากใช้ <strong>Classic Token</strong>: ต้องติ๊กเลือกขอบเขต (Scope) <strong style="color: #00ff87;">repo</strong> เท่านั้น</li>
+                                <li>หากใช้ <strong>Classic Token</strong>: ต้องติ๊กเลือกขอบเขต (Scope) <strong style="color: #15803d;">repo</strong> เท่านั้น</li>
                             </ul>
                         </div>
                     </div>
@@ -478,13 +478,13 @@
             </div>
 
             <!-- Quick District & Hospital Filters (Visible only in MOPH mode) -->
-            <div class="filter-tabs" id="moph-hospital-filter" style="display: none; margin-top: 8px; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px; background: rgba(30, 41, 59, 0.5); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.1);">
+            <div class="filter-tabs" id="moph-hospital-filter" style="display: none; margin-top: 8px; align-items: center; flex-wrap: wrap; gap: 16px; padding: 12px; background: rgba(241, 245, 249, 0.7); border-radius: 12px; border: 1px solid rgba(15, 23, 42, 0.1);">
                 <!-- District Dropdown -->
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="color: var(--neon-purple); font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
                         <i data-lucide="map-pin" style="width: 18px; height: 18px;"></i> กรองรายอำเภอ:
                     </span>
-                    <select id="select-district" class="form-select" style="min-width: 160px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--neon-purple); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(157, 78, 221, 0.15); font-family: var(--font-main);">
+                    <select id="select-district" class="form-select" style="min-width: 160px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--neon-purple); color: var(--text-primary); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(157, 78, 221, 0.15); font-family: var(--font-main);">
                         <option value="all">🗺️ ทุกอำเภอ (ทั้งหมด)</option>
                     </select>
                 </div>
@@ -494,7 +494,7 @@
                     <span style="color: var(--neon-cyan); font-weight: bold; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; white-space: nowrap;">
                         <i data-lucide="building-2" style="width: 18px; height: 18px;"></i> กรองหน่วยบริการ:
                     </span>
-                    <select id="select-hospital" class="form-select" style="max-width: 320px; background: rgba(15, 23, 42, 0.8); border: 1px solid var(--neon-cyan); color: #fff; border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(0, 242, 254, 0.15); font-family: var(--font-main);">
+                    <select id="select-hospital" class="form-select" style="max-width: 320px; background: rgba(255, 255, 255, 0.8); border: 1px solid var(--neon-cyan); color: var(--text-primary); border-radius: 8px; padding: 6px 12px; font-size: 0.9rem; cursor: pointer; box-shadow: 0 0 10px rgba(0, 184, 212, 0.15); font-family: var(--font-main);">
                         <option value="all">🏥 ทุกหน่วยบริการ (ทั้งหมด)</option>
                     </select>
                 </div>

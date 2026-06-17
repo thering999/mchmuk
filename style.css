@@ -9,29 +9,30 @@
 /* --- Design Tokens / Custom Variables --- */
 :root {
     /* Color Palette */
-    --bg-darker: #060913;
-    --bg-dark: #0b0f19;
-    --bg-card: rgba(13, 20, 38, 0.55);
-    --bg-card-hover: rgba(20, 30, 58, 0.75);
-    
+    --bg-darker: #eef2fb;
+    --bg-dark: #f7f9fd;
+    --bg-card: rgba(255, 255, 255, 0.75);
+    --bg-card-hover: rgba(255, 255, 255, 0.95);
+    --ink: #0f172a;
+
     /* Neon Glow Accents */
-    --neon-cyan: #00f2fe;
-    --neon-cyan-glow: rgba(0, 242, 254, 0.35);
+    --neon-cyan: #00b8d4;
+    --neon-cyan-glow: rgba(0, 184, 212, 0.3);
     --neon-purple: #9d4edd;
-    --neon-purple-glow: rgba(157, 78, 221, 0.35);
+    --neon-purple-glow: rgba(157, 78, 221, 0.3);
     --neon-pink: #ff007f;
-    --neon-pink-glow: rgba(255, 0, 127, 0.35);
-    
+    --neon-pink-glow: rgba(255, 0, 127, 0.3);
+
     /* Text Colors */
-    --text-primary: #f1f5f9;
-    --text-secondary: #94a3b8;
+    --text-primary: #1e293b;
+    --text-secondary: #475569;
     --text-muted: #64748b;
-    --text-cyan: #00f2fe;
-    
+    --text-cyan: #0891b2;
+
     /* UI Scale & Borders */
-    --border-glow: rgba(0, 242, 254, 0.15);
-    --border-glow-purple: rgba(157, 78, 221, 0.15);
-    --border-light: rgba(255, 255, 255, 0.05);
+    --border-glow: rgba(0, 184, 212, 0.25);
+    --border-glow-purple: rgba(157, 78, 221, 0.25);
+    --border-light: rgba(15, 23, 42, 0.08);
     --border-radius-lg: 16px;
     --border-radius-md: 10px;
     --border-radius-sm: 6px;
@@ -49,12 +50,12 @@
 
 body {
     background-color: var(--bg-darker);
-    background-image: 
-        radial-gradient(at 0% 0%, rgba(20, 10, 45, 0.4) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(5, 30, 50, 0.4) 0px, transparent 50%),
-        radial-gradient(at 50% 100%, rgba(35, 5, 45, 0.3) 0px, transparent 50%),
-        linear-gradient(rgba(255, 255, 255, 0.007) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.007) 1px, transparent 1px);
+    background-image:
+        radial-gradient(at 0% 0%, rgba(186, 230, 253, 0.6) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(233, 213, 255, 0.5) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(252, 207, 233, 0.45) 0px, transparent 50%),
+        linear-gradient(rgba(15, 23, 42, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(15, 23, 42, 0.02) 1px, transparent 1px);
     background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
     color: var(--text-primary);
     font-family: var(--font-sans);
@@ -97,12 +98,12 @@ header {
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    background: rgba(11, 15, 25, 0.7);
+    background: rgba(255, 255, 255, 0.7);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-glow);
     border-radius: var(--border-radius-lg);
-    box-shadow: 0 0 25px rgba(0, 242, 254, 0.08);
+    box-shadow: 0 0 25px rgba(0, 184, 212, 0.08);
     position: relative;
     overflow: hidden;
 }
@@ -132,7 +133,7 @@ header::before {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--bg-darker);
+    color: var(--ink);
     box-shadow: 0 0 15px var(--neon-cyan-glow);
     animation: pulseGlow 3s infinite alternate;
 }
@@ -196,7 +197,7 @@ header::before {
 .dropzone-card:hover, .dropzone-card.dragover {
     border-color: var(--neon-cyan);
     background: var(--bg-card-hover);
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+    box-shadow: 0 0 20px rgba(0, 184, 212, 0.15);
 }
 
 .dropzone-icon {
@@ -228,7 +229,7 @@ header::before {
 }
 
 .btn {
-    background: linear-gradient(135deg, rgba(0, 242, 254, 0.15) 0%, rgba(157, 78, 221, 0.15) 100%);
+    background: linear-gradient(135deg, rgba(0, 184, 212, 0.15) 0%, rgba(157, 78, 221, 0.15) 100%);
     border: 1px solid var(--neon-cyan);
     color: var(--neon-cyan);
     padding: 10px 24px;
@@ -247,7 +248,7 @@ header::before {
 
 .btn:hover {
     background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
-    color: var(--bg-darker);
+    color: var(--ink);
     box-shadow: 0 0 18px var(--neon-cyan-glow);
     transform: translateY(-2px);
     border-color: transparent;
@@ -335,7 +336,7 @@ header::before {
 }
 
 .status-badge.success {
-    background: rgba(0, 242, 254, 0.15);
+    background: rgba(0, 184, 212, 0.15);
     color: var(--neon-cyan);
     border: 1px solid var(--neon-cyan);
     box-shadow: 0 0 10px var(--neon-cyan-glow);
@@ -343,7 +344,7 @@ header::before {
 
 /* --- Control & Configuration Panel --- */
 .control-panel {
-    background: rgba(11, 15, 25, 0.85);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
     border: 1px solid var(--border-glow-purple);
@@ -395,7 +396,7 @@ header::before {
 }
 
 .form-select {
-    background: rgba(6, 9, 19, 0.8);
+    background: rgba(241, 245, 249, 0.8);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius-md);
     color: var(--text-primary);
@@ -448,7 +449,7 @@ header::before {
 
 .kpi-card.cyan:hover {
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.15);
+    box-shadow: 0 0 20px rgba(0, 184, 212, 0.15);
 }
 
 .kpi-card.purple:hover {
@@ -485,7 +486,7 @@ header::before {
 }
 
 .kpi-card.cyan .kpi-icon {
-    background: rgba(0, 242, 254, 0.1);
+    background: rgba(0, 184, 212, 0.1);
     color: var(--neon-cyan);
 }
 
@@ -543,7 +544,7 @@ header::before {
 }
 
 .chart-card:hover {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(15, 23, 42, 0.12);
 }
 
 .chart-card.col-6 { grid-column: span 6; }
@@ -581,8 +582,7 @@ header::before {
 }
 
 .chart-body {
-    flex-grow: 1;
-    min-height: 320px;
+    height: 340px;
     width: 100%;
 }
 
@@ -614,7 +614,7 @@ header::before {
 }
 
 .search-input {
-    background: rgba(6, 9, 19, 0.8);
+    background: rgba(241, 245, 249, 0.8);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius-md);
     color: var(--text-primary);
@@ -659,7 +659,7 @@ table {
 }
 
 thead {
-    background: rgba(6, 9, 19, 0.95);
+    background: rgba(241, 245, 249, 0.95);
     border-bottom: 1px solid var(--border-light);
 }
 
@@ -678,7 +678,7 @@ th {
 
 th:hover {
     color: var(--neon-cyan);
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(15, 23, 42, 0.03);
 }
 
 th .sort-icon {
@@ -717,7 +717,7 @@ tr {
 }
 
 tr:hover {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(15, 23, 42, 0.03);
 }
 
 /* Pagination */
@@ -740,7 +740,7 @@ tr:hover {
 }
 
 .page-btn {
-    background: rgba(11, 15, 25, 0.8);
+    background: rgba(255, 255, 255, 0.8);
     border: 1px solid var(--border-light);
     color: var(--text-primary);
     width: 36px;
@@ -767,7 +767,7 @@ tr:hover {
 
 .page-btn.active {
     background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
-    color: var(--bg-darker);
+    color: var(--ink);
     border-color: transparent;
     box-shadow: 0 0 12px var(--neon-cyan-glow);
 }
@@ -779,7 +779,7 @@ tr:hover {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(6, 9, 19, 0.85);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(8px);
     display: flex;
     flex-direction: column;
@@ -806,7 +806,7 @@ tr:hover {
     border-bottom-color: var(--neon-purple);
     border-radius: 50%;
     animation: spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.2);
+    box-shadow: 0 0 20px rgba(0, 184, 212, 0.2);
     position: relative;
 }
 
@@ -836,10 +836,10 @@ tr:hover {
 /* --- Keyframe Animations --- */
 @keyframes pulseGlow {
     from {
-        box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+        box-shadow: 0 0 10px rgba(0, 184, 212, 0.3);
     }
     to {
-        box-shadow: 0 0 25px rgba(0, 242, 254, 0.7), 0 0 10px rgba(157, 78, 221, 0.5);
+        box-shadow: 0 0 25px rgba(0, 184, 212, 0.7), 0 0 10px rgba(157, 78, 221, 0.5);
     }
 }
 
@@ -902,7 +902,7 @@ footer a:hover {
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: rgba(4, 6, 12, 0.95);
+    background: rgba(15, 23, 42, 0.55);
     backdrop-filter: blur(25px);
     -webkit-backdrop-filter: blur(25px);
     z-index: 1000;
@@ -913,9 +913,9 @@ footer a:hover {
 }
 
 .login-card {
-    background: rgba(13, 20, 38, 0.7);
+    background: rgba(255, 255, 255, 0.9);
     border: 1px solid var(--neon-cyan);
-    box-shadow: 0 0 30px rgba(0, 242, 254, 0.2), inset 0 0 15px rgba(0, 242, 254, 0.05);
+    box-shadow: 0 0 30px rgba(0, 184, 212, 0.2), inset 0 0 15px rgba(0, 184, 212, 0.05);
     border-radius: var(--border-radius-lg);
     width: 100%;
     max-width: 420px;
@@ -948,7 +948,7 @@ footer a:hover {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: var(--bg-darker);
+    color: var(--ink);
     box-shadow: 0 0 20px var(--neon-cyan-glow);
     margin-bottom: 16px;
 }
@@ -998,7 +998,7 @@ footer a:hover {
 }
 
 .login-input {
-    background: rgba(6, 9, 19, 0.9);
+    background: rgba(241, 245, 249, 0.9);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius-md);
     color: var(--text-primary);
@@ -1035,7 +1035,7 @@ footer a:hover {
 
 /* User Badge in Header */
 .user-profile-badge {
-    background: rgba(255, 255, 255, 0.03);
+    background: rgba(15, 23, 42, 0.04);
     border: 1px solid var(--border-light);
     padding: 6px 14px;
     border-radius: 30px;
@@ -1047,7 +1047,7 @@ footer a:hover {
 }
 
 .user-profile-badge:hover {
-    border-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(15, 23, 42, 0.12);
 }
 
 .user-avatar {
@@ -1102,7 +1102,7 @@ footer a:hover {
 
 /* Database Batch Selector styles */
 .db-selector-card {
-    background: rgba(11, 15, 25, 0.6);
+    background: rgba(255, 255, 255, 0.6);
     border: 1px solid var(--border-light);
     border-radius: var(--border-radius-lg);
     padding: 20px;
@@ -1125,8 +1125,8 @@ footer a:hover {
 }
 
 .batch-item {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(15, 23, 42, 0.03);
+    border: 1px solid rgba(15, 23, 42, 0.08);
     border-radius: var(--border-radius-md);
     padding: 10px 14px;
     display: flex;
@@ -1137,14 +1137,14 @@ footer a:hover {
 }
 
 .batch-item:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(15, 23, 42, 0.05);
     border-color: var(--neon-cyan);
 }
 
 .batch-item.active {
-    background: rgba(0, 242, 254, 0.05);
+    background: rgba(0, 184, 212, 0.05);
     border-color: var(--neon-cyan);
-    box-shadow: 0 0 10px rgba(0, 242, 254, 0.1);
+    box-shadow: 0 0 10px rgba(0, 184, 212, 0.1);
 }
 
 .batch-meta-info {
@@ -1170,9 +1170,9 @@ footer a:hover {
 }
 
 .batch-badge {
-    background: rgba(0, 242, 254, 0.1);
+    background: rgba(0, 184, 212, 0.1);
     color: var(--neon-cyan);
-    border: 1px solid rgba(0, 242, 254, 0.2);
+    border: 1px solid rgba(0, 184, 212, 0.2);
     font-size: 0.7rem;
     padding: 2px 8px;
     border-radius: 12px;

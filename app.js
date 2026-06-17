@@ -488,24 +488,24 @@ function showToast(message, type = 'info', duration = 4000) {
     const colors = {
         success: { border: '#00ff87', bg: 'rgba(0,255,135,0.12)', icon: '✅' },
         error:   { border: '#ff007f', bg: 'rgba(255,0,127,0.12)', icon: '❌' },
-        info:    { border: '#00f2fe', bg: 'rgba(0,242,254,0.12)', icon: '📊' },
+        info:    { border: '#00b8d4', bg: 'rgba(0,184,212,0.12)', icon: '📊' },
         warn:    { border: '#ffb300', bg: 'rgba(255,179,0,0.12)', icon: '⚠️' }
     };
     const c = colors[type] || colors.info;
 
     const toast = document.createElement('div');
     toast.style.cssText = `
-        background: ${c.bg};
+        background: linear-gradient(${c.bg}, ${c.bg}), #ffffff;
         border: 1px solid ${c.border};
         border-left: 4px solid ${c.border};
         border-radius: 10px;
         padding: 14px 20px;
-        color: #e2e8f0;
+        color: #1e293b;
         font-family: 'Outfit', sans-serif;
         font-size: 0.9rem;
         min-width: 280px;
         max-width: 420px;
-        box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 12px ${c.border}40;
+        box-shadow: 0 4px 24px rgba(15,23,42,0.15), 0 0 12px ${c.border}40;
         pointer-events: all;
         cursor: pointer;
         opacity: 0;
@@ -1455,10 +1455,10 @@ function renderMophModeCharts(rows) {
             type: 'bar',
             height: '100%',
             background: 'transparent',
-            foreColor: '#94a3b8',
+            foreColor: '#475569',
             toolbar: { show: false }
         },
-        theme: { mode: 'dark' },
+        theme: { mode: 'light' },
         colors: ['#00f2fe', '#9d4edd'], // Cyan for Supplement, Purple for HCT Screening!
         plotOptions: {
             bar: {
@@ -1486,9 +1486,9 @@ function renderMophModeCharts(rows) {
                 }
             }]
         },
-        grid: { borderColor: 'rgba(255,255,255,0.05)' },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
-            theme: 'dark',
+            theme: 'light',
             y: {
                 formatter: function (val, { seriesIndex, dataPointIndex }) {
                     const h = hospitals[dataPointIndex];
@@ -1522,10 +1522,10 @@ function renderMophModeCharts(rows) {
             type: 'donut',
             height: '100%',
             background: 'transparent',
-            foreColor: '#94a3b8'
+            foreColor: '#475569'
         },
-        theme: { mode: 'dark' },
-        colors: ['#00ff87', '#ff007f', 'rgba(255,255,255,0.15)'], // Cyan-Green = Normal, Cyber Pink = Anemic, Dark Gray = Not tested
+        theme: { mode: 'light' },
+        colors: ['#00ff87', '#ff007f', 'rgba(100,116,139,0.3)'], // Cyan-Green = Normal, Cyber Pink = Anemic, Dark Gray = Not tested
         labels: ['เจาะแล้วปกติ (Normal HCT)', 'เจาะแล้วซีด (Anemic HCT)', 'ยังไม่เจาะ Lab HCT'],
         plotOptions: {
             pie: {
@@ -1555,7 +1555,7 @@ function renderMophModeCharts(rows) {
         },
         dataLabels: { enabled: true },
         legend: { position: 'bottom', fontSize: '9px' },
-        tooltip: { theme: 'dark' }
+        tooltip: { theme: 'light' }
     };
 
     if (charts.donut) {
@@ -1602,7 +1602,7 @@ function renderMophModeCharts(rows) {
             type: 'area',
             height: '100%',
             background: 'transparent',
-            foreColor: '#94a3b8',
+            foreColor: '#475569',
             toolbar: { show: true },
             dropShadow: {
                 enabled: true,
@@ -1613,7 +1613,7 @@ function renderMophModeCharts(rows) {
                 opacity: 0.25
             }
         },
-        theme: { mode: 'dark' },
+        theme: { mode: 'light' },
         colors: ['#9d4edd', '#00f2fe'], // Purple for Supplement, Cyan for HCT Lab
         fill: {
             type: 'gradient',
@@ -1647,9 +1647,9 @@ function renderMophModeCharts(rows) {
                 }
             }]
         },
-        grid: { borderColor: 'rgba(255,255,255,0.06)' },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
-            theme: 'dark',
+            theme: 'light',
             y: {
                 formatter: function (val, { seriesIndex, dataPointIndex }) {
                     const age = sortedAges[dataPointIndex];
@@ -1689,10 +1689,10 @@ function renderMophModeCharts(rows) {
             type: 'bar',
             height: '100%',
             background: 'transparent',
-            foreColor: '#94a3b8',
+            foreColor: '#475569',
             toolbar: { show: false }
         },
-        theme: { mode: 'dark' },
+        theme: { mode: 'light' },
         colors: ['#ff007f'], // Cyber pink for clinical indicators
         plotOptions: {
             bar: {
@@ -1714,9 +1714,9 @@ function renderMophModeCharts(rows) {
         yaxis: {
             labels: { formatter: function (val) { return val + "%"; } }
         },
-        grid: { borderColor: 'rgba(255,255,255,0.05)' },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
-            theme: 'dark',
+            theme: 'light',
             y: {
                 formatter: function (val, { dataPointIndex }) {
                     if (dataPointIndex === 0) {
@@ -1797,19 +1797,19 @@ function renderGenericCharts(rows) {
             type: 'area',
             height: '100%',
             background: 'transparent',
-            foreColor: '#94a3b8',
+            foreColor: '#475569',
             toolbar: { show: true },
             dropShadow: { enabled: true, top: 5, left: 0, blur: 8, color: neonColors, opacity: 0.25 }
         },
-        theme: { mode: 'dark' },
+        theme: { mode: 'light' },
         colors: neonColors,
         fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] } },
         stroke: { curve: 'smooth', width: 3 },
         xaxis: { categories: chartCategories, labels: { rotate: -45, style: { fontSize: '10px' } } },
         yaxis: { labels: { formatter: function (value) { return formatCompactNumber(value); } } },
-        grid: { borderColor: 'rgba(255,255,255,0.06)' },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
-            theme: 'dark',
+            theme: 'light',
             y: { formatter: function (val) { return val.toLocaleString('th-TH') + ` (${appState.yAxisCol})`; } }
         }
     };
@@ -1819,15 +1819,15 @@ function renderGenericCharts(rows) {
     // bar
     const barOptions = {
         series: chartSeries,
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#94a3b8', toolbar: { show: false } },
-        theme: { mode: 'dark' },
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        theme: { mode: 'light' },
         colors: neonColors,
         plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 4 } },
         stroke: { show: true, width: 2, colors: ['transparent'] },
         xaxis: { categories: chartCategories, labels: { rotate: -45, style: { fontSize: '10px' } } },
         yaxis: { labels: { formatter: function (value) { return formatCompactNumber(value); } } },
-        grid: { borderColor: 'rgba(255,255,255,0.06)' },
-        tooltip: { theme: 'dark', y: { formatter: function (val) { return val.toLocaleString('th-TH'); } } }
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
+        tooltip: { theme: 'light', y: { formatter: function (val) { return val.toLocaleString('th-TH'); } } }
     };
     if (charts.bar) charts.bar.updateOptions(barOptions);
     else { charts.bar = new ApexCharts(document.getElementById('chart-bar'), barOptions); charts.bar.render(); }
@@ -1848,8 +1848,8 @@ function renderGenericCharts(rows) {
     }
     const donutOptions = {
         series: donutSeries,
-        chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#94a3b8' },
-        theme: { mode: 'dark' },
+        chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#475569' },
+        theme: { mode: 'light' },
         colors: neonColors,
         labels: donutLabels,
         plotOptions: {
@@ -1875,7 +1875,7 @@ function renderGenericCharts(rows) {
         },
         dataLabels: { enabled: false },
         legend: { position: 'bottom', fontSize: '10px' },
-        tooltip: { theme: 'dark', y: { formatter: function (val) { return val.toLocaleString('th-TH'); } } }
+        tooltip: { theme: 'light', y: { formatter: function (val) { return val.toLocaleString('th-TH'); } } }
     };
     if (charts.donut) charts.donut.updateOptions(donutOptions);
     else { charts.donut = new ApexCharts(document.getElementById('chart-donut'), donutOptions); charts.donut.render(); }
@@ -1904,8 +1904,8 @@ function renderGenericCharts(rows) {
     }
     const radarOptions = {
         series: radarSeries,
-        chart: { type: 'radar', height: '100%', background: 'transparent', foreColor: '#94a3b8', toolbar: { show: false } },
-        theme: { mode: 'dark' },
+        chart: { type: 'radar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        theme: { mode: 'light' },
         colors: neonColors,
         labels: radarCategories,
         stroke: { width: 2 },
@@ -2002,14 +2002,14 @@ function renderTable() {
                     if (isReceivedValue(val)) {
                         td.innerHTML = `<span class="status-badge success" style="box-shadow: none; font-size: 0.7rem; padding: 2px 6px;">ได้รับ</span>`;
                     } else {
-                        td.innerHTML = `<span class="status-badge pending" style="box-shadow: none; font-size: 0.7rem; padding: 2px 6px; background: rgba(255,255,255,0.03); color: var(--text-muted); border-color: rgba(255,255,255,0.1)">-</span>`;
+                        td.innerHTML = `<span class="status-badge pending" style="box-shadow: none; font-size: 0.7rem; padding: 2px 6px; background: rgba(15,23,42,0.04); color: var(--text-muted); border-color: rgba(15,23,42,0.1)">-</span>`;
                     }
                 } else if (header === 'anemea' && appState.isMophMode) {
                     const anemiaVal = cleanNumericValue(val);
                     if (anemiaVal === 2) {
                         td.innerHTML = `<span class="status-badge pending" style="background: rgba(255, 0, 127, 0.1); color: var(--neon-pink); border-color: var(--neon-pink); font-size: 0.7rem; padding: 2px 6px;">โลหิตจาง</span>`;
                     } else if (anemiaVal === 0) {
-                        td.innerHTML = `<span class="status-badge success" style="background: rgba(0, 242, 254, 0.05); color: var(--text-secondary); border-color: transparent; font-size: 0.7rem; padding: 2px 6px;">ปกติ</span>`;
+                        td.innerHTML = `<span class="status-badge success" style="background: rgba(0, 184, 212, 0.08); color: var(--text-secondary); border-color: transparent; font-size: 0.7rem; padding: 2px 6px;">ปกติ</span>`;
                     } else {
                         td.textContent = String(val);
                     }
