@@ -1258,17 +1258,17 @@ function applyAllFilters() {
                 if (hasBirth) {
                     const parseBirth = (val) => {
                         if (val === undefined || val === null || val === '') return null;
-                        // Excel serial number (numeric)
-                        if (typeof val === 'number' || (typeof val === 'string' && /^\d{5,6}$/.test(val.trim()))) {
-                            const serial = typeof val === 'number' ? val : parseFloat(val);
-                            if (serial > 10000) return new Date((serial - 25569) * 86400 * 1000);
-                        }
-                        // Thai BE string: DD/MM/YYYY or D/M/YYYY where YYYY >= 2500
                         const strVal = String(val).trim();
+                        // Excel serial: numeric value 10000–99999 (covers dates ~1927–2173)
+                        const num = parseFloat(strVal);
+                        if (!isNaN(num) && num > 10000 && num < 100000) {
+                            return new Date((num - 25569) * 86400 * 1000);
+                        }
+                        // Thai BE string: DD/MM/YYYY where YYYY >= 2500
                         const thMatch = strVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
                         if (thMatch) {
                             let [, d, m, y] = thMatch.map(Number);
-                            if (y >= 2500) y -= 543; // BE to CE
+                            if (y >= 2500) y -= 543;
                             return new Date(y, m - 1, d);
                         }
                         // ISO string YYYY-MM-DD
