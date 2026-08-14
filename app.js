@@ -1193,10 +1193,10 @@ function applyAllFilters() {
         const ageCol = appState.headers.includes('age_m') ? 'age_m' : '';
         if (ageCol) {
             if (appState.activeMophIndicator === 'anemia-12m') {
-                // Fixed range: อายุครบ 12 เดือน = 9-15 เดือน (per HDC definition)
+                // ช่วงเจาะ lab: อายุ 6-12 เดือน (per HDC definition s_date=birth+6m, e_date=birth+13m-1d)
                 filtered = filtered.filter(row => {
                     const age = cleanNumericValue(row[ageCol]);
-                    return age >= 9 && age <= 15;
+                    return age >= 6 && age <= 12;
                 });
             } else {
                 filtered = filtered.filter(row => {
@@ -1380,17 +1380,19 @@ function renderKPIs() {
             document.getElementById('kpi-avg-title').textContent = "ร้อยละเด็กมีภาวะโลหิตจาง";
             document.getElementById('kpi-total-avg').textContent = anemiaRate.toFixed(1) + "%";
 
+            // เป้าหมาย ปี 2569=≤17%, ปี 2570=≤16% (ใช้ ≤17% เป็น default ปีปัจจุบัน)
+            const anemiaTarget = 17.0;
             const targetBadge = document.getElementById('moph-target-badge');
-            if (anemiaRate <= 12.0 && totalTested > 0) {
+            if (anemiaRate <= anemiaTarget && totalTested > 0) {
                 document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
-                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (≤12%)`;
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (≤${anemiaTarget}%)`;
                 targetBadge.className = "target-badge met";
                 targetBadge.innerHTML = `บรรลุเป้าหมาย: ${anemiaRate.toFixed(1)}%`;
             } else {
                 document.getElementById('kpi-avg-subtitle').className = "kpi-trend negative";
-                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="alert-triangle"></i> สูงกว่าเกณฑ์เป้าหมาย (>12%)`;
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="alert-triangle"></i> สูงกว่าเกณฑ์เป้าหมาย (>${anemiaTarget}%)`;
                 targetBadge.className = "target-badge";
-                targetBadge.innerHTML = `เป้าหมาย ≤12% | ปัจจุบัน ${anemiaRate.toFixed(1)}%`;
+                targetBadge.innerHTML = `เป้าหมาย ≤${anemiaTarget}% | ปัจจุบัน ${anemiaRate.toFixed(1)}%`;
             }
 
             // 4. KPI: มีภาวะโลหิตจาง (ตัวเศษ)
@@ -1885,7 +1887,7 @@ function renderAnemia12mCharts(rows) {
             min: 0, max: 100,
             labels: { formatter: val => val + "%" }
         },
-        annotations: { xaxis: [{ x: 12, borderColor: '#00ff87', borderWidth: 2, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ (12%)' } }] },
+        annotations: { xaxis: [{ x: 17, borderColor: '#00ff87', borderWidth: 2, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ปี 2569 (17%)' } }] },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
             theme: 'light',
@@ -1966,7 +1968,7 @@ function renderAnemia12mCharts(rows) {
         dataLabels: { enabled: true, formatter: val => val + "%", offsetY: -18, style: { fontSize: '11px', colors: ['#b45309'] } },
         xaxis: { categories: amps, labels: { style: { fontSize: '11px', fontWeight: 'bold' } } },
         yaxis: { min: 0, labels: { formatter: val => val + "%" } },
-        annotations: { yaxis: [{ y: 12, borderColor: '#00ff87', borderWidth: 2, strokeDashArray: 4, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ 12%' } }] },
+        annotations: { yaxis: [{ y: 17, borderColor: '#00ff87', borderWidth: 2, strokeDashArray: 4, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ปี 2569 (17%)' } }] },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: { theme: 'light', y: { formatter: (val, { dataPointIndex }) => {
             const a = amps[dataPointIndex];
