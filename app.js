@@ -1632,7 +1632,7 @@ function renderMophModeCharts(rows) {
             foreColor: '#475569'
         },
         theme: { mode: 'light' },
-        colors: ['#16a34a', '#dc2626', 'rgba(100,116,139,0.3)'], // Green = Normal, Red = Anemic, Gray = Not tested
+        colors: ['#16a34a', '#dc2626', '#f59e0b'], // Green = Normal, Red = Anemic, Yellow = Not tested
         labels: ['เจาะแล้วปกติ (Normal HCT)', 'เจาะแล้วซีด (Anemic HCT)', 'ยังไม่เจาะ Lab HCT'],
         plotOptions: {
             pie: {
@@ -1661,7 +1661,7 @@ function renderMophModeCharts(rows) {
             }
         },
         dataLabels: { enabled: true },
-        legend: { position: 'bottom', fontSize: '9px' },
+        legend: { position: 'bottom', fontSize: '9px', markers: { size: 7, shape: 'circle', strokeWidth: 0 } },
         tooltip: { theme: 'light' }
     };
 
@@ -1942,8 +1942,8 @@ function renderAnemia12mCharts(rows) {
         series: [totalNormal, totalAnemia, totalUntested],
         chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#475569' },
         theme: { mode: 'light' },
-        colors: ['#16a34a', '#dc2626', '#94a3b8'],
-        labels: ['🟢 ปกติ (HCT≥33 / Hb≥11)', '🔴 ซีด (HCT<33 / Hb<11)', '⬜ ยังไม่ได้ตรวจ Lab'],
+        colors: ['#16a34a', '#dc2626', '#f59e0b'],
+        labels: ['ปกติ (HCT≥33 / Hb≥11)', 'ซีด (HCT<33 / Hb<11)', 'ยังไม่ได้ตรวจ Lab'],
         plotOptions: { pie: { donut: { size: '65%', labels: { show: true,
             name: { show: true, fontSize: '11px' },
             value: { show: true, fontSize: '15px', fontWeight: 'bold', formatter: val => val.toLocaleString() + ' ราย' },
@@ -1953,7 +1953,7 @@ function renderAnemia12mCharts(rows) {
             const count = w.config.series[seriesIndex];
             return count > 0 ? count.toLocaleString() + ' ราย' : '';
         }},
-        legend: { position: 'bottom', fontSize: '10px' },
+        legend: { position: 'bottom', fontSize: '10px', markers: { size: 7, shape: 'circle', strokeWidth: 0 } },
         tooltip: { theme: 'light', y: { formatter: val => val.toLocaleString() + ' ราย' } }
     };
     if (charts.donut) { charts.donut.updateOptions(donutOptions); }
@@ -2301,12 +2301,37 @@ function renderTable() {
                     } else {
                         td.innerHTML = `<span class="status-badge pending" style="box-shadow: none; font-size: 0.7rem; padding: 2px 6px; background: rgba(15,23,42,0.04); color: var(--text-muted); border-color: rgba(15,23,42,0.1)">-</span>`;
                     }
+                } else if (header === 'lab_result_status' && appState.isMophMode) {
+                    const labStatus = cleanNumericValue(val);
+                    if (labStatus === 1) {
+                        td.innerHTML = `<span class="status-badge success" style="background: rgba(22,163,74,0.1); color: #16a34a; border-color: rgba(22,163,74,0.3); font-size: 0.7rem; padding: 2px 6px;">มีผล</span>`;
+                    } else {
+                        td.innerHTML = `<span class="status-badge" style="background: rgba(245,158,11,0.1); color: #d97706; border-color: rgba(245,158,11,0.3); font-size: 0.7rem; padding: 2px 6px;">ไม่มีผล</span>`;
+                    }
+                } else if (['result_hct','labresult','labtest','lab_date'].includes(header) && appState.isMophMode) {
+                    const labStatus = cleanNumericValue(row['lab_result_status']);
+                    if (labStatus !== 1) {
+                        td.innerHTML = `<span style="color: var(--text-muted); font-size: 0.8rem;">-</span>`;
+                    } else {
+                        if (header === 'lab_date' && appState.detectedTypes[header] === 'date') {
+                            td.textContent = formatDateString(val);
+                        } else {
+                            const cleanNum = cleanNumericValue(val);
+                            td.textContent = cleanNum.toLocaleString('th-TH', { maximumFractionDigits: 4 });
+                            td.style.fontFamily = 'var(--font-display)';
+                            td.style.fontWeight = '500';
+                            td.style.textAlign = 'right';
+                        }
+                    }
                 } else if (header === 'anemea' && appState.isMophMode) {
+                    const labStatus = cleanNumericValue(row['lab_result_status']);
                     const anemiaVal = cleanNumericValue(val);
-                    if (anemiaVal === 2) {
+                    if (labStatus !== 1) {
+                        td.innerHTML = `<span class="status-badge" style="background: rgba(245,158,11,0.1); color: #d97706; border-color: rgba(245,158,11,0.3); font-size: 0.7rem; padding: 2px 6px;">ไม่มีผล lab</span>`;
+                    } else if (anemiaVal === 2) {
                         td.innerHTML = `<span class="status-badge pending" style="background: rgba(220, 38, 38, 0.1); color: var(--neon-pink); border-color: var(--neon-pink); font-size: 0.7rem; padding: 2px 6px;">โลหิตจาง</span>`;
                     } else if (anemiaVal === 0) {
-                        td.innerHTML = `<span class="status-badge success" style="background: rgba(2, 132, 199, 0.08); color: var(--text-secondary); border-color: transparent; font-size: 0.7rem; padding: 2px 6px;">ปกติ</span>`;
+                        td.innerHTML = `<span class="status-badge success" style="background: rgba(22, 163, 74, 0.1); color: #16a34a; border-color: rgba(22,163,74,0.3); font-size: 0.7rem; padding: 2px 6px;">ปกติ</span>`;
                     } else {
                         td.textContent = String(val);
                     }
