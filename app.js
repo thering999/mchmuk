@@ -49,6 +49,8 @@ let appState = {
     // Specialized MOPH Mode State
     isMophMode: false,
     activeMophIndicator: "iron-supplement", // "iron-supplement" | "anemia-12m"
+    fiscalYear: 2569,       // Thai fiscal year (ปีงบประมาณ)
+    exportDate: null,       // Date object — วันที่ดาวน์โหลดข้อมูล (null = today)
     activeAgeFilter: "all", // all, 6-12, 36-60
     activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
     activeHospitalFilter: "all",
@@ -138,6 +140,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Bind Age Tabs for MOPH Mode
     initMophAgeFilters();
     initMophHctFilters();
+    initCohortControls();
 
     // Bind Hospital & District select filters
     const selectDistrict = document.getElementById('select-district');
@@ -405,12 +408,17 @@ function initMophIndicatorTabs() {
             if (appState.activeMophIndicator === 'iron-supplement') {
                 if (ageFilters) ageFilters.style.display = 'flex';
                 if (hctFilters) hctFilters.style.display = 'flex';
+                const cohortControls = document.getElementById('moph-cohort-controls');
+                if (cohortControls) cohortControls.style.display = 'none';
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
                     'ร้อยละของเด็กอายุ 6 เดือน – 5 ปี ได้รับยาน้ำเสริมธาตุเหล็ก (เป้าหมาย: ร้อยละ 75.0 ขึ้นไป)';
             } else {
                 if (ageFilters) ageFilters.style.display = 'none';
                 if (hctFilters) hctFilters.style.display = 'none';
+                const cohortControls = document.getElementById('moph-cohort-controls');
+                if (cohortControls) cohortControls.style.display = 'flex';
+                updateCohortHint();
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
                     'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (เป้าหมาย: ไม่เกินร้อยละ 12)';
@@ -420,6 +428,49 @@ function initMophIndicatorTabs() {
             triggerAnalyticsUpdate();
         });
     });
+}
+
+// --- Cohort Hint + Events ---
+function updateCohortHint() {
+    const fy = appState.fiscalYear;
+    const fyStartCE = fy - 543 - 1;
+    const fyEndCE = fy - 543;
+    const cohortStart = new Date(fyStartCE, 9, 1);
+    const cohortEnd   = new Date(fyEndCE,   8, 30);
+    const refDate = appState.exportDate || new Date();
+    const monthsDiff = (d1, d2) => (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+    const minAge = Math.floor(monthsDiff(cohortEnd, refDate));
+    const maxAge = Math.ceil(monthsDiff(cohortStart, refDate));
+    const hint = document.getElementById('cohort-age-hint');
+    const hasBirth = appState.headers && appState.headers.includes('birth');
+    if (hint) hint.textContent = hasBirth
+        ? `✓ กรองจาก birth column: เกิด 1 ต.ค.${fy-1} – 30 ก.ย.${fy}`
+        : `⚠ ไม่มี birth column → ประมาณจาก age_m ${minAge}–${maxAge} เดือน`;
+}
+
+function initCohortControls() {
+    // Set default export date = today
+    const exportInput = document.getElementById('export-date-input');
+    if (exportInput) {
+        const today = new Date();
+        exportInput.value = today.toISOString().split('T')[0];
+        appState.exportDate = today;
+        exportInput.addEventListener('change', (e) => {
+            appState.exportDate = e.target.value ? new Date(e.target.value) : new Date();
+            updateCohortHint();
+            applyAllFilters();
+            triggerAnalyticsUpdate();
+        });
+    }
+    const fySelect = document.getElementById('fiscal-year-select');
+    if (fySelect) {
+        fySelect.addEventListener('change', (e) => {
+            appState.fiscalYear = parseInt(e.target.value);
+            updateCohortHint();
+            applyAllFilters();
+            triggerAnalyticsUpdate();
+        });
+    }
 }
 
 // --- Setup Age Segment Tab Filters for MOPH Mode ---
@@ -1193,11 +1244,37 @@ function applyAllFilters() {
         const ageCol = appState.headers.includes('age_m') ? 'age_m' : '';
         if (ageCol) {
             if (appState.activeMophIndicator === 'anemia-12m') {
-                // ช่วงเจาะ lab: อายุ 6-12 เดือน (per HDC definition s_date=birth+6m, e_date=birth+13m-1d)
-                filtered = filtered.filter(row => {
-                    const age = cleanNumericValue(row[ageCol]);
-                    return age >= 6 && age <= 12;
-                });
+                // Cohort = เด็กที่อายุครบ 12 เดือน ภายในปีงบประมาณที่เลือก
+                // birth range: Oct 1 (FY-1 CE) – Sep 30 (FY CE)  [Thai FY→CE: FY-543]
+                const fy = appState.fiscalYear;
+                const fyStartCE = fy - 543 - 1;
+                const fyEndCE = fy - 543;
+                const cohortStart = new Date(fyStartCE, 9, 1);   // Oct 1
+                const cohortEnd   = new Date(fyEndCE,   8, 30);  // Sep 30
+                const hasBirth = appState.headers.includes('birth');
+                if (hasBirth) {
+                    // birth column = Excel serial date (days since 1900-01-01, with leap year bug offset)
+                    const excelDateToJs = (serial) => {
+                        const d = new Date((serial - 25569) * 86400 * 1000);
+                        return d;
+                    };
+                    filtered = filtered.filter(row => {
+                        const birthSerial = cleanNumericValue(row['birth']);
+                        if (!birthSerial) return false;
+                        const birthDate = excelDateToJs(birthSerial);
+                        return birthDate >= cohortStart && birthDate <= cohortEnd;
+                    });
+                } else {
+                    // fallback: estimate from age_m
+                    const refDate = appState.exportDate || new Date();
+                    const monthsDiff = (d1, d2) => (d2.getFullYear() - d1.getFullYear()) * 12 + (d2.getMonth() - d1.getMonth());
+                    const minAge = Math.floor(monthsDiff(cohortEnd, refDate));
+                    const maxAge = Math.ceil(monthsDiff(cohortStart, refDate));
+                    filtered = filtered.filter(row => {
+                        const age = cleanNumericValue(row[ageCol]);
+                        return age >= minAge && age <= maxAge;
+                    });
+                }
             } else {
                 filtered = filtered.filter(row => {
                     const age = cleanNumericValue(row[ageCol]);
@@ -1367,7 +1444,7 @@ function renderKPIs() {
             const anemiaRate = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
 
             // 1. KPI: เด็กอายุครบ 12 เดือน
-            document.getElementById('kpi-1-title').textContent = "เด็กอายุครบ 12 เดือน (9-15 เดือน)";
+            document.getElementById('kpi-1-title').textContent = "เด็กอายุครบ 12 เดือน (6-12 เดือน)";
             document.getElementById('kpi-total-rows').textContent = totalChildren.toLocaleString();
             document.getElementById('kpi-1-subtitle').innerHTML = `<i data-lucide="baby"></i> ทั้งหมดในเขตรับผิดชอบ`;
 
@@ -1661,7 +1738,7 @@ function renderMophModeCharts(rows) {
             }
         },
         dataLabels: { enabled: true },
-        legend: { position: 'bottom', fontSize: '9px', markers: { size: 7, shape: 'circle', strokeWidth: 0 } },
+        legend: { position: 'bottom', fontSize: '9px', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
         tooltip: { theme: 'light' }
     };
 
@@ -1909,7 +1986,7 @@ function renderAnemia12mCharts(rows) {
             categories: hospLabels,
             labels: { formatter: val => val.toLocaleString() + ' ราย' }
         },
-        legend: { position: 'top', markers: { radius: 4 } },
+        legend: { position: 'top', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
             theme: 'light',
@@ -1953,7 +2030,7 @@ function renderAnemia12mCharts(rows) {
             const count = w.config.series[seriesIndex];
             return count > 0 ? count.toLocaleString() + ' ราย' : '';
         }},
-        legend: { position: 'bottom', fontSize: '10px', markers: { size: 7, shape: 'circle', strokeWidth: 0 } },
+        legend: { position: 'bottom', fontSize: '10px', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
         tooltip: { theme: 'light', y: { formatter: val => val.toLocaleString() + ' ราย' } }
     };
     if (charts.donut) { charts.donut.updateOptions(donutOptions); }
@@ -1978,7 +2055,7 @@ function renderAnemia12mCharts(rows) {
             labels: { rotate: -45, style: { fontSize: '9px' } }
         },
         yaxis: { title: { text: 'จำนวน (ราย)' } },
-        legend: { position: 'top', markers: { radius: 4 } },
+        legend: { position: 'top', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: { theme: 'light', shared: true, y: { formatter: (val, { seriesIndex, dataPointIndex }) => {
             const h = hospAllSorted[dataPointIndex];
@@ -2016,7 +2093,7 @@ function renderAnemia12mCharts(rows) {
         plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
         xaxis: { categories: amps, labels: { style: { fontSize: '11px', fontWeight: 'bold' } } },
         yaxis: { title: { text: 'จำนวน (ราย)' } },
-        legend: { position: 'top', markers: { radius: 4 } },
+        legend: { position: 'top', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         dataLabels: { enabled: true, formatter: (val, { seriesIndex, dataPointIndex }) => {
             if (seriesIndex !== 1) return '';

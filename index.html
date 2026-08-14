@@ -455,6 +455,26 @@
                 </button>
             </div>
 
+            <!-- Fiscal Year & Export Date (Visible only in anemia-12m mode) -->
+            <div id="moph-cohort-controls" style="display: none; align-items: center; gap: 16px; padding: 10px 14px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+                <i data-lucide="calendar-range" style="width:16px;height:16px;color:#d97706;flex-shrink:0;"></i>
+                <span style="font-weight:600; color:#d97706;">Cohort filter</span>
+                <label style="display:flex;align-items:center;gap:6px;">
+                    ปีงบประมาณ
+                    <select id="fiscal-year-select" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:var(--surface);color:var(--text-primary);font-size:0.82rem;">
+                        <option value="2567">2567</option>
+                        <option value="2568">2568</option>
+                        <option value="2569" selected>2569</option>
+                        <option value="2570">2570</option>
+                    </select>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;">
+                    วันที่ดาวน์โหลดข้อมูล
+                    <input type="date" id="export-date-input" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:var(--surface);color:var(--text-primary);font-size:0.82rem;">
+                </label>
+                <span id="cohort-age-hint" style="font-size:0.78rem;color:var(--text-muted);"></span>
+            </div>
+
             <!-- Quick Age Filters (Visible only in MOPH mode - iron supplement indicator) -->
             <div class="filter-tabs" id="moph-age-filters" style="display: none;">
                 <button class="filter-tab-btn active" data-age-range="all">
