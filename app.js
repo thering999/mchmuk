@@ -1337,9 +1337,9 @@ function applyAllFilters() {
             } else if (appState.activeHctFilter === 'tested') {
                 return labStatus === 1;
             } else if (appState.activeHctFilter === 'anemia') {
-                return labStatus === 1 && anemia > 0;
+                return labStatus === 1 && isAnemicRow(row);
             } else if (appState.activeHctFilter === 'normal') {
-                return labStatus === 1 && anemia === 0;
+                return labStatus === 1 && !isAnemicRow(row);
             }
             return true;
         });
@@ -1420,6 +1420,17 @@ function handleTableSearch() {
 // 📐 Aggregation & Metric Calculation
 // ==========================================================================
 
+// คำนวณภาวะโลหิตจางจาก labresult โดยตรง (anemea column ใน export มักไม่ถูก populate)
+function isAnemicRow(r) {
+    const lt = String(r['labtest'] || '').trim();
+    const lr = parseFloat(r['labresult']);
+    if (!isNaN(lr) && lr > 0) {
+        if (lt === '0621201') return lr < 33;                          // HCT < 33
+        if (lt === '0621401' || lt === '0621402') return lr < 11;     // Hb < 11
+    }
+    return isAnemicRow(r); // fallback
+}
+
 function cleanNumericValue(val) {
     if (val === undefined || val === null || val === "") return 0;
     if (typeof val === 'number') return val;
@@ -1466,7 +1477,7 @@ function renderKPIs() {
             const totalChildren = rows.length;
             const testedRows = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1);
             const totalTested = testedRows.length;
-            const totalAnemia = testedRows.filter(r => cleanNumericValue(r['anemea']) > 0).length;
+            const totalAnemia = testedRows.filter(r => isAnemicRow(r)).length;
             const totalNormal = totalTested - totalAnemia;
 
             const screeningRate = totalChildren > 0 ? (totalTested / totalChildren * 100) : 0;
@@ -1518,7 +1529,7 @@ function renderKPIs() {
 
             // Anemia and HCT screening rates calculation
             const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
-            const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
+            const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
 
             const testedRate = totalTarget > 0 ? (totalTested / totalTarget * 100) : 0;
             const anemiaPrevalence = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
@@ -1726,7 +1737,7 @@ function renderMophModeCharts(rows) {
     const totalTarget = rows.length;
     const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
     const totalNotTested = totalTarget - totalTested;
-    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
+    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
     const totalNormal = totalTested - totalAnemia;
 
     const donutOptions = {
@@ -1886,11 +1897,11 @@ function renderMophModeCharts(rows) {
     // 4. ANEMIA RATE CLINICAL CORRELATION
     // Compare anemia prevalence among tested children: Received Supplement vs Not Received Supplement
     const receivedTestedRows = rows.filter(r => isReceivedValue(r['result']) && cleanNumericValue(r['lab_result_status']) === 1);
-    const receivedAnemiaCount = receivedTestedRows.filter(r => cleanNumericValue(r['anemea']) > 0).length;
+    const receivedAnemiaCount = receivedTestedRows.filter(r => isAnemicRow(r)).length;
     const anemiaRateReceived = receivedTestedRows.length > 0 ? (receivedAnemiaCount / receivedTestedRows.length * 100) : 0;
 
     const notReceivedTestedRows = rows.filter(r => !isReceivedValue(r['result']) && cleanNumericValue(r['lab_result_status']) === 1);
-    const notReceivedAnemiaCount = notReceivedTestedRows.filter(r => cleanNumericValue(r['anemea']) > 0).length;
+    const notReceivedAnemiaCount = notReceivedTestedRows.filter(r => isAnemicRow(r)).length;
     const anemiaRateNotReceived = notReceivedTestedRows.length > 0 ? (notReceivedAnemiaCount / notReceivedTestedRows.length * 100) : 0;
 
     const radarOptions = {
@@ -1984,7 +1995,7 @@ function renderAnemia12mCharts(rows) {
         hospMap[hosp].total++;
         if (cleanNumericValue(r['lab_result_status']) === 1) {
             hospMap[hosp].tested++;
-            if (cleanNumericValue(r['anemea']) > 0) hospMap[hosp].anemia++;
+            if (isAnemicRow(r)) hospMap[hosp].anemia++;
         }
     });
 
@@ -2039,7 +2050,7 @@ function renderAnemia12mCharts(rows) {
 
     // 2. DONUT CHART: ปกติ(เขียว) / ซีด(แดง) / ยังไม่ตรวจ(เทา)
     const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
-    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
+    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
     const totalNormal = totalTested - totalAnemia;
     const totalUntested = rows.length - totalTested;
     const anemiaRateOverall = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
@@ -2104,7 +2115,7 @@ function renderAnemia12mCharts(rows) {
         if (!ampMap[amp]) ampMap[amp] = { tested: 0, anemia: 0 };
         if (cleanNumericValue(r['lab_result_status']) === 1) {
             ampMap[amp].tested++;
-            if (cleanNumericValue(r['anemea']) > 0) ampMap[amp].anemia++;
+            if (isAnemicRow(r)) ampMap[amp].anemia++;
         }
     });
     const amps = Object.keys(ampMap).filter(a => ampMap[a].tested > 0).sort((a, b) => {
@@ -3009,4 +3020,3 @@ function refreshBatchList() {}
 function loadLatestActiveBatch() {}
 async function saveActiveDataset() { return { ok: true }; }
 async function getActiveDataset() { return null; }
-// Fri, Aug 14, 2026  6:37:50 PM
