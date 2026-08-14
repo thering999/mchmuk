@@ -433,8 +433,9 @@ function initMophIndicatorTabs() {
 // --- Cohort Hint + Events ---
 function updateCohortHint() {
     const fy = appState.fiscalYear;
-    const fyStartCE = fy - 543 - 1;
-    const fyEndCE = fy - 543;
+    // เด็กที่ "อายุครบ 12 เดือน" ใน FY = เด็กที่เกิดในปีก่อนหน้า (1st birthday ตกใน FY)
+    const fyStartCE = fy - 543 - 2;   // Oct 1 ปีก่อน FY
+    const fyEndCE   = fy - 543 - 1;   // Sep 30 ก่อนเริ่ม FY
     const cohortStart = new Date(fyStartCE, 9, 1);
     const cohortEnd   = new Date(fyEndCE,   8, 30);
     const refDate = appState.exportDate || new Date();
@@ -444,7 +445,7 @@ function updateCohortHint() {
     const hint = document.getElementById('cohort-age-hint');
     const hasBirth = appState.headers && appState.headers.includes('birth');
     if (hint) hint.textContent = hasBirth
-        ? `✓ เกิด 1 ต.ค.พ.ศ.${fy-1} – 30 ก.ย.พ.ศ.${fy}`
+        ? `✓ เกิด 1 ต.ค.พ.ศ.${fy-2} – 30 ก.ย.พ.ศ.${fy-1}`
         : `⚠ ไม่มี birth column → ประมาณจาก age_m ${minAge}–${maxAge} เดือน`;
 }
 
@@ -1248,8 +1249,9 @@ function applyAllFilters() {
                 // Cohort = เด็กที่อายุครบ 12 เดือน ภายในปีงบประมาณที่เลือก
                 // birth range: Oct 1 (FY-1 CE) – Sep 30 (FY CE)  [Thai FY→CE: FY-543]
                 const fy = appState.fiscalYear;
-                const fyStartCE = fy - 543 - 1;
-                const fyEndCE = fy - 543;
+                // เด็กที่ 1st birthday ตกใน FY เกิดปีก่อน FY
+                const fyStartCE = fy - 543 - 2;   // Oct 1 ปีก่อน FY
+                const fyEndCE   = fy - 543 - 1;   // Sep 30 ก่อนเริ่ม FY
                 const cohortStart = new Date(fyStartCE, 9, 1);   // Oct 1
                 const cohortEnd   = new Date(fyEndCE,   8, 30);  // Sep 30
                 const hasBirth = appState.headers.includes('birth');
