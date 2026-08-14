@@ -1256,15 +1256,33 @@ function applyAllFilters() {
                 const cohortEnd   = new Date(fyEndCE,   8, 30);  // Sep 30
                 const hasBirth = appState.headers.includes('birth');
                 if (hasBirth) {
-                    // birth column = Excel serial date (days since 1900-01-01, with leap year bug offset)
-                    const excelDateToJs = (serial) => {
-                        const d = new Date((serial - 25569) * 86400 * 1000);
-                        return d;
+                    const parseBirth = (val) => {
+                        if (val === undefined || val === null || val === '') return null;
+                        // Excel serial number (numeric)
+                        if (typeof val === 'number' || (typeof val === 'string' && /^\d{5,6}$/.test(val.trim()))) {
+                            const serial = typeof val === 'number' ? val : parseFloat(val);
+                            if (serial > 10000) return new Date((serial - 25569) * 86400 * 1000);
+                        }
+                        // Thai BE string: DD/MM/YYYY or D/M/YYYY where YYYY >= 2500
+                        const strVal = String(val).trim();
+                        const thMatch = strVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                        if (thMatch) {
+                            let [, d, m, y] = thMatch.map(Number);
+                            if (y >= 2500) y -= 543; // BE to CE
+                            return new Date(y, m - 1, d);
+                        }
+                        // ISO string YYYY-MM-DD
+                        const isoMatch = strVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+                        if (isoMatch) {
+                            let [, y, m, d] = isoMatch.map(Number);
+                            if (y >= 2500) y -= 543;
+                            return new Date(y, m - 1, d);
+                        }
+                        return null;
                     };
                     filtered = filtered.filter(row => {
-                        const birthSerial = cleanNumericValue(row['birth']);
-                        if (!birthSerial) return false;
-                        const birthDate = excelDateToJs(birthSerial);
+                        const birthDate = parseBirth(row['birth']);
+                        if (!birthDate) return false;
                         return birthDate >= cohortStart && birthDate <= cohortEnd;
                     });
                 } else {
