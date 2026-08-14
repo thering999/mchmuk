@@ -444,7 +444,7 @@ function updateCohortHint() {
     const hint = document.getElementById('cohort-age-hint');
     const hasBirth = appState.headers && appState.headers.includes('birth');
     if (hint) hint.textContent = hasBirth
-        ? `✓ กรองจาก birth column: เกิด 1 ต.ค.${fy-1} – 30 ก.ย.${fy}`
+        ? `✓ เกิด 1 ต.ค.พ.ศ.${fy-1} – 30 ก.ย.พ.ศ.${fy}`
         : `⚠ ไม่มี birth column → ประมาณจาก age_m ${minAge}–${maxAge} เดือน`;
 }
 
@@ -464,6 +464,7 @@ function initCohortControls() {
     }
     const fySelect = document.getElementById('fiscal-year-select');
     if (fySelect) {
+        fySelect.value = String(appState.fiscalYear); // sync UI to state
         fySelect.addEventListener('change', (e) => {
             appState.fiscalYear = parseInt(e.target.value);
             updateCohortHint();
