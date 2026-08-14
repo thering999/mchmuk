@@ -1846,11 +1846,29 @@ function renderMophModeCharts(rows) {
 
 // --- MOPH Indicator: ร้อยละเด็กอายุครบ 12 เดือน มีภาวะโลหิตจาง ---
 function renderAnemia12mCharts(rows) {
-    document.getElementById('chart-bar-title').innerHTML = `<i data-lucide="bar-chart-4"></i> ร้อยละภาวะโลหิตจางรายหน่วยบริการ (เป้าหมาย ≤12%)`;
-    document.getElementById('chart-donut-title').innerHTML = `<i data-lucide="pie-chart"></i> สัดส่วนภาวะโลหิตจาง (เด็กอายุครบ 12 เดือน)`;
-    document.getElementById('chart-area-title').innerHTML = `<i data-lucide="trending-up"></i> จำนวนเด็กอายุครบ 12 เดือน รายหน่วยบริการ (ตัวส่วน vs ตัวเศษ)`;
+    document.getElementById('chart-bar-title').innerHTML = `<i data-lucide="bar-chart-4"></i> ร้อยละภาวะโลหิตจางรายหน่วยบริการ (เป้าหมาย ≤17%)`;
+    document.getElementById('chart-donut-title').innerHTML = `<i data-lucide="pie-chart"></i> สัดส่วนภาวะโลหิตจาง (เด็กอายุ 6-12 เดือน)`;
+    document.getElementById('chart-area-title').innerHTML = `<i data-lucide="trending-up"></i> จำนวนเด็กอายุ 6-12 เดือน รายหน่วยบริการ (ตัวส่วน vs ตัวเศษ)`;
     document.getElementById('chart-radar-title').innerHTML = `<i data-lucide="activity"></i> เปรียบเทียบอัตราโลหิตจางรายอำเภอ`;
     lucide.createIcons();
+
+    // Empty state: ไม่มีข้อมูล lab HCT/Hb ในช่วงอายุ 6-12 เดือน
+    const hasLabData = rows.some(r => cleanNumericValue(r['lab_result_status']) === 1);
+    if (rows.length === 0 || !hasLabData) {
+        const noDataMsg = `<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:160px;flex-direction:column;gap:12px;color:var(--text-muted);">
+            <i data-lucide="flask-conical-off" style="width:40px;height:40px;opacity:0.4;"></i>
+            <div style="text-align:center;font-size:0.85rem;">
+                <strong style="color:var(--text-secondary);">ไม่มีข้อมูลผล Lab HCT/Hb ในช่วงอายุ 6-12 เดือน</strong><br>
+                <span style="font-size:0.78rem;margin-top:4px;display:block;">ตัวชี้วัดนี้ต้องการข้อมูล lab_result_status และ anemea ของเด็กอายุ 6-12 เดือน</span>
+            </div>
+        </div>`;
+        ['chart-bar','chart-donut','chart-area','chart-radar'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = noDataMsg;
+        });
+        lucide.createIcons();
+        return;
+    }
 
     // --- Hospital anemia data ---
     const hospMap = {};
@@ -1873,34 +1891,47 @@ function renderAnemia12mCharts(rows) {
             return rB - rA;
         }).slice(0, 15);
 
-    const anemiaRates = hospitals.map(h => parseFloat((hospMap[h].anemia / hospMap[h].tested * 100).toFixed(1)));
+    const hospLabels = hospitals.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.'));
+    const normalCounts = hospitals.map(h => hospMap[h].tested - hospMap[h].anemia);
+    const anemiaCounts = hospitals.map(h => hospMap[h].anemia);
 
-    // 1. BAR CHART: Anemia rate per hospital
+    // 1. STACKED HORIZONTAL BAR: ปกติ(เขียว) + ซีด(แดง) รายหน่วยบริการ — sort worst first
     const barOptions = {
-        series: [{ name: 'ร้อยละภาวะโลหิตจาง', data: anemiaRates }],
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        series: [
+            { name: '🟢 ปกติ (Normal)', data: normalCounts },
+            { name: '🔴 ซีด / โลหิตจาง', data: anemiaCounts }
+        ],
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: true }, stacked: true },
         theme: { mode: 'light' },
-        colors: ['#dc2626'],
-        plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '70%' } },
+        colors: ['#16a34a', '#dc2626'],
+        plotOptions: { bar: { horizontal: true, borderRadius: 3, barHeight: '65%' } },
         xaxis: {
-            categories: hospitals.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.')),
-            min: 0, max: 100,
-            labels: { formatter: val => val + "%" }
+            categories: hospLabels,
+            labels: { formatter: val => val.toLocaleString() + ' ราย' }
         },
-        annotations: { xaxis: [{ x: 17, borderColor: '#00ff87', borderWidth: 2, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ปี 2569 (17%)' } }] },
+        legend: { position: 'top', markers: { radius: 4 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
             theme: 'light',
-            y: { formatter: (val, { dataPointIndex }) => {
+            shared: true,
+            y: { formatter: (val, { seriesIndex, dataPointIndex }) => {
                 const h = hospitals[dataPointIndex];
-                return `${val}% (ซีด ${hospMap[h].anemia} จากที่เจาะ ${hospMap[h].tested} คน)`;
+                const rate = hospMap[h].tested > 0 ? (hospMap[h].anemia / hospMap[h].tested * 100).toFixed(1) : 0;
+                return seriesIndex === 1
+                    ? `${val} ราย — ซีด ${rate}% จากที่เจาะทั้งหมด ${hospMap[h].tested} คน`
+                    : `${val} ราย`;
             }}
+        },
+        dataLabels: {
+            enabled: true,
+            formatter: (val, { seriesIndex }) => seriesIndex === 1 && val > 0 ? val : '',
+            style: { fontSize: '10px', colors: ['#fff'] }
         }
     };
     if (charts.bar) { charts.bar.updateOptions(barOptions); }
     else { charts.bar = new ApexCharts(document.getElementById('chart-bar'), barOptions); charts.bar.render(); }
 
-    // 2. DONUT CHART: Anemia vs Normal vs Untested
+    // 2. DONUT CHART: ปกติ(เขียว) / ซีด(แดง) / ยังไม่ตรวจ(เทา)
     const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
     const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
     const totalNormal = totalTested - totalAnemia;
@@ -1911,42 +1942,56 @@ function renderAnemia12mCharts(rows) {
         series: [totalNormal, totalAnemia, totalUntested],
         chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#475569' },
         theme: { mode: 'light' },
-        colors: ['#16a34a', '#dc2626', 'rgba(100,116,139,0.3)'],
-        labels: ['ตรวจแล้วปกติ', 'ตรวจแล้วมีภาวะโลหิตจาง', 'ยังไม่ได้ตรวจ'],
-        plotOptions: { pie: { donut: { size: '65%', labels: { show: true, name: { show: true, fontSize: '11px' }, value: { show: true, fontSize: '15px', fontWeight: 'bold', formatter: val => val.toLocaleString() + ' ราย' }, total: { show: true, label: 'ร้อยละซีด', fontSize: '10px', formatter: () => anemiaRateOverall.toFixed(1) + "%" } } } } },
-        dataLabels: { enabled: true },
-        legend: { position: 'bottom', fontSize: '9px' },
-        tooltip: { theme: 'light' }
+        colors: ['#16a34a', '#dc2626', '#94a3b8'],
+        labels: ['🟢 ปกติ (HCT≥33 / Hb≥11)', '🔴 ซีด (HCT<33 / Hb<11)', '⬜ ยังไม่ได้ตรวจ Lab'],
+        plotOptions: { pie: { donut: { size: '65%', labels: { show: true,
+            name: { show: true, fontSize: '11px' },
+            value: { show: true, fontSize: '15px', fontWeight: 'bold', formatter: val => val.toLocaleString() + ' ราย' },
+            total: { show: true, label: '% ซีด (จากที่เจาะ)', fontSize: '9px', formatter: () => anemiaRateOverall.toFixed(1) + "%" }
+        } } } },
+        dataLabels: { enabled: true, formatter: (val, { seriesIndex, w }) => {
+            const count = w.config.series[seriesIndex];
+            return count > 0 ? count.toLocaleString() + ' ราย' : '';
+        }},
+        legend: { position: 'bottom', fontSize: '10px' },
+        tooltip: { theme: 'light', y: { formatter: val => val.toLocaleString() + ' ราย' } }
     };
     if (charts.donut) { charts.donut.updateOptions(donutOptions); }
     else { charts.donut = new ApexCharts(document.getElementById('chart-donut'), donutOptions); charts.donut.render(); }
 
-    // 3. AREA/BAR CHART: Tested vs Anemia count per hospital (stacked)
+    // 3. STACKED BAR: ปกติ(เขียว) + ซีด(แดง) รายหน่วยบริการ — sort by total
     const hospAllSorted = Object.keys(hospMap)
-        .filter(h => hospMap[h].total > 0)
-        .sort((a, b) => hospMap[b].total - hospMap[a].total)
+        .filter(h => hospMap[h].tested > 0)
+        .sort((a, b) => hospMap[b].tested - hospMap[a].tested)
         .slice(0, 15);
     const areaOptions = {
         series: [
-            { name: 'เจาะ Lab แล้ว (ตัวส่วน)', data: hospAllSorted.map(h => hospMap[h].tested) },
-            { name: 'มีภาวะโลหิตจาง (ตัวเศษ)', data: hospAllSorted.map(h => hospMap[h].anemia) }
+            { name: '🟢 ปกติ', data: hospAllSorted.map(h => hospMap[h].tested - hospMap[h].anemia) },
+            { name: '🔴 ซีด / โลหิตจาง', data: hospAllSorted.map(h => hospMap[h].anemia) }
         ],
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: true } },
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: true }, stacked: true },
         theme: { mode: 'light' },
-        colors: ['#0284c7', '#dc2626'],
-        plotOptions: { bar: { horizontal: false, columnWidth: '60%', borderRadius: 3 } },
+        colors: ['#16a34a', '#dc2626'],
+        plotOptions: { bar: { horizontal: false, columnWidth: '65%', borderRadius: 3 } },
         xaxis: {
             categories: hospAllSorted.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.')),
             labels: { rotate: -45, style: { fontSize: '9px' } }
         },
         yaxis: { title: { text: 'จำนวน (ราย)' } },
+        legend: { position: 'top', markers: { radius: 4 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
-        tooltip: { theme: 'light', y: { formatter: val => val.toLocaleString() + ' ราย' } }
+        tooltip: { theme: 'light', shared: true, y: { formatter: (val, { seriesIndex, dataPointIndex }) => {
+            const h = hospAllSorted[dataPointIndex];
+            const rate = hospMap[h].tested > 0 ? (hospMap[h].anemia / hospMap[h].tested * 100).toFixed(1) : 0;
+            return seriesIndex === 1
+                ? `${val} ราย (${rate}% ซีด)`
+                : `${val} ราย`;
+        }}}
     };
     if (charts.area) { charts.area.updateOptions(areaOptions); }
     else { charts.area = new ApexCharts(document.getElementById('chart-area'), areaOptions); charts.area.render(); }
 
-    // 4. BAR CHART: Anemia rate per district (Amphur)
+    // 4. STACKED BAR: ปกติ(เขียว) + ซีด(แดง) รายอำเภอ + เส้นเกณฑ์ %
     const ampMap = {};
     rows.forEach(r => {
         const amp = String(r['amp_name'] || r['ampname'] || 'ไม่ทราบอำเภอ');
@@ -1956,23 +2001,33 @@ function renderAnemia12mCharts(rows) {
             if (cleanNumericValue(r['anemea']) > 0) ampMap[amp].anemia++;
         }
     });
-    const amps = Object.keys(ampMap).filter(a => ampMap[a].tested > 0);
-    const ampRates = amps.map(a => parseFloat((ampMap[a].anemia / ampMap[a].tested * 100).toFixed(1)));
+    const amps = Object.keys(ampMap).filter(a => ampMap[a].tested > 0).sort((a, b) => {
+        return (ampMap[b].anemia / ampMap[b].tested) - (ampMap[a].anemia / ampMap[a].tested);
+    });
 
     const radarOptions = {
-        series: [{ name: 'ร้อยละโลหิตจาง', data: ampRates }],
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        series: [
+            { name: '🟢 ปกติ', data: amps.map(a => ampMap[a].tested - ampMap[a].anemia) },
+            { name: '🔴 ซีด / โลหิตจาง', data: amps.map(a => ampMap[a].anemia) }
+        ],
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false }, stacked: true },
         theme: { mode: 'light' },
-        colors: ['#f59e0b'],
-        plotOptions: { bar: { columnWidth: '50%', borderRadius: 4, dataLabels: { position: 'top' } } },
-        dataLabels: { enabled: true, formatter: val => val + "%", offsetY: -18, style: { fontSize: '11px', colors: ['#b45309'] } },
+        colors: ['#16a34a', '#dc2626'],
+        plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
         xaxis: { categories: amps, labels: { style: { fontSize: '11px', fontWeight: 'bold' } } },
-        yaxis: { min: 0, labels: { formatter: val => val + "%" } },
-        annotations: { yaxis: [{ y: 17, borderColor: '#00ff87', borderWidth: 2, strokeDashArray: 4, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ปี 2569 (17%)' } }] },
+        yaxis: { title: { text: 'จำนวน (ราย)' } },
+        legend: { position: 'top', markers: { radius: 4 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
-        tooltip: { theme: 'light', y: { formatter: (val, { dataPointIndex }) => {
+        dataLabels: { enabled: true, formatter: (val, { seriesIndex, dataPointIndex }) => {
+            if (seriesIndex !== 1) return '';
             const a = amps[dataPointIndex];
-            return `${val}% (ซีด ${ampMap[a].anemia} จากที่เจาะ ${ampMap[a].tested} คน)`;
+            const rate = ampMap[a].tested > 0 ? (ampMap[a].anemia / ampMap[a].tested * 100).toFixed(1) : 0;
+            return rate + '%';
+        }, style: { fontSize: '10px', colors: ['#fff'] } },
+        tooltip: { theme: 'light', shared: true, y: { formatter: (val, { seriesIndex, dataPointIndex }) => {
+            const a = amps[dataPointIndex];
+            const rate = ampMap[a].tested > 0 ? (ampMap[a].anemia / ampMap[a].tested * 100).toFixed(1) : 0;
+            return seriesIndex === 1 ? `${val} ราย (${rate}% ซีด)` : `${val} ราย`;
         }}}
     };
     if (charts.radar) { charts.radar.updateOptions(radarOptions); }
