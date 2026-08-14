@@ -445,7 +445,17 @@
         <!-- ⚡ Main Analytics Dashboard Area -->
         <div id="dashboard-content" style="display: none; flex-direction: column; gap: 24px;">
             
-            <!-- Quick Age Filters (Visible only in MOPH mode) -->
+            <!-- Indicator Group Tabs (Visible only in MOPH mode) -->
+            <div class="filter-tabs" id="moph-indicator-tabs" style="display: none; border-bottom: 2px solid rgba(2, 132, 199, 0.2); padding-bottom: 12px; margin-bottom: 4px;">
+                <button class="filter-tab-btn active" data-indicator="iron-supplement" style="font-size: 0.9rem; padding: 10px 18px;">
+                    <i data-lucide="pill"></i> ยาเสริมธาตุเหล็ก (Coverage ≥75%)
+                </button>
+                <button class="filter-tab-btn" data-indicator="anemia-12m" style="font-size: 0.9rem; padding: 10px 18px;">
+                    <i data-lucide="heart-pulse"></i> ภาวะโลหิตจาง อายุครบ 12 เดือน (≤12%)
+                </button>
+            </div>
+
+            <!-- Quick Age Filters (Visible only in MOPH mode - iron supplement indicator) -->
             <div class="filter-tabs" id="moph-age-filters" style="display: none;">
                 <button class="filter-tab-btn active" data-age-range="all">
                     <i data-lucide="users"></i> เด็กเป้าหมายทุกคน (6 เดือน - 5 ปี)

@@ -48,6 +48,7 @@ let appState = {
 
     // Specialized MOPH Mode State
     isMophMode: false,
+    activeMophIndicator: "iron-supplement", // "iron-supplement" | "anemia-12m"
     activeAgeFilter: "all", // all, 6-12, 36-60
     activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
     activeHospitalFilter: "all",
@@ -130,6 +131,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Bind Demo & Local Loader
     document.getElementById('btn-load-local').addEventListener('click', loadLocalExcelFile);
+
+    // Bind Indicator Group Tabs for MOPH Mode
+    initMophIndicatorTabs();
 
     // Bind Age Tabs for MOPH Mode
     initMophAgeFilters();
@@ -381,6 +385,41 @@ async function handleUserLogout() {
         toggleLoader(false);
         showToast('🚪 ออกจากระบบเรียบร้อยแล้ว', 'info', 3000);
     }
+}
+
+// --- Setup Indicator Group Tab Switcher for MOPH Mode ---
+function initMophIndicatorTabs() {
+    const tabs = document.querySelectorAll('#moph-indicator-tabs .filter-tab-btn');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            tabs.forEach(t => t.classList.remove('active'));
+            const target = e.currentTarget;
+            target.classList.add('active');
+
+            appState.activeMophIndicator = target.dataset.indicator;
+            appState.currentPage = 1;
+
+            // Show/hide age & HCT filters based on indicator
+            const ageFilters = document.getElementById('moph-age-filters');
+            const hctFilters = document.getElementById('moph-hct-filters');
+            if (appState.activeMophIndicator === 'iron-supplement') {
+                if (ageFilters) ageFilters.style.display = 'flex';
+                if (hctFilters) hctFilters.style.display = 'flex';
+                // Update banner
+                document.querySelector('#moph-banner .moph-alert-title p').textContent =
+                    'ร้อยละของเด็กอายุ 6 เดือน – 5 ปี ได้รับยาน้ำเสริมธาตุเหล็ก (เป้าหมาย: ร้อยละ 75.0 ขึ้นไป)';
+            } else {
+                if (ageFilters) ageFilters.style.display = 'none';
+                if (hctFilters) hctFilters.style.display = 'none';
+                // Update banner
+                document.querySelector('#moph-banner .moph-alert-title p').textContent =
+                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (เป้าหมาย: ไม่เกินร้อยละ 12)';
+            }
+
+            applyAllFilters();
+            triggerAnalyticsUpdate();
+        });
+    });
 }
 
 // --- Setup Age Segment Tab Filters for MOPH Mode ---
@@ -882,31 +921,39 @@ function detectMophIronDataset() {
 
     if (hasHosname && hasAge && hasResult) {
         appState.isMophMode = true;
+        appState.activeMophIndicator = 'iron-supplement';
 
         // Show HDC specific UI banners
         document.getElementById('moph-banner').style.display = 'flex';
+        document.getElementById('moph-indicator-tabs').style.display = 'flex';
         document.getElementById('moph-age-filters').style.display = 'flex';
         document.getElementById('moph-hct-filters').style.display = 'flex';
-        
+
+        // Reset indicator tab active state to iron-supplement
+        document.querySelectorAll('#moph-indicator-tabs .filter-tab-btn').forEach(t => t.classList.remove('active'));
+        const ironTab = document.querySelector('#moph-indicator-tabs .filter-tab-btn[data-indicator="iron-supplement"]');
+        if (ironTab) ironTab.classList.add('active');
+
         const mophHospitalFilter = document.getElementById('moph-hospital-filter');
         if (mophHospitalFilter) {
             mophHospitalFilter.style.display = 'flex';
             populateDistrictSelect();
             populateHospitalSelect();
         }
-        
+
         document.getElementById('moph-mode-notice').textContent = "📌 วิเคราะห์ในโหมดผู้รับธาตุเหล็ก (MOPH HDC Mode)";
     } else {
         appState.isMophMode = false;
         document.getElementById('moph-banner').style.display = 'none';
+        document.getElementById('moph-indicator-tabs').style.display = 'none';
         document.getElementById('moph-age-filters').style.display = 'none';
         document.getElementById('moph-hct-filters').style.display = 'none';
-        
+
         const mophHospitalFilter = document.getElementById('moph-hospital-filter');
         if (mophHospitalFilter) {
             mophHospitalFilter.style.display = 'none';
         }
-        
+
         document.getElementById('moph-mode-notice').textContent = "";
     }
 }
@@ -1145,24 +1192,30 @@ function applyAllFilters() {
     if (appState.isMophMode) {
         const ageCol = appState.headers.includes('age_m') ? 'age_m' : '';
         if (ageCol) {
-            filtered = filtered.filter(row => {
-                const age = cleanNumericValue(row[ageCol]);
-
-                if (appState.activeAgeFilter === 'all') {
-                    // MOPH Target standard children aged 6 months - 5 years (6 to 60 months)
-                    return age >= 6 && age <= 60;
-                } else if (appState.activeAgeFilter === '6-12') {
-                    return age >= 6 && age <= 12;
-                } else if (appState.activeAgeFilter === '36-60') {
-                    return age >= 36 && age <= 60;
-                }
-                return true;
-            });
+            if (appState.activeMophIndicator === 'anemia-12m') {
+                // Fixed range: อายุครบ 12 เดือน = 9-15 เดือน (per HDC definition)
+                filtered = filtered.filter(row => {
+                    const age = cleanNumericValue(row[ageCol]);
+                    return age >= 9 && age <= 15;
+                });
+            } else {
+                filtered = filtered.filter(row => {
+                    const age = cleanNumericValue(row[ageCol]);
+                    if (appState.activeAgeFilter === 'all') {
+                        return age >= 6 && age <= 60;
+                    } else if (appState.activeAgeFilter === '6-12') {
+                        return age >= 6 && age <= 12;
+                    } else if (appState.activeAgeFilter === '36-60') {
+                        return age >= 36 && age <= 60;
+                    }
+                    return true;
+                });
+            }
         }
     }
 
-    // 1.5 Apply Specialized MOPH HCT Lab Filter if active
-    if (appState.isMophMode) {
+    // 1.5 Apply Specialized MOPH HCT Lab Filter if active (iron-supplement indicator only)
+    if (appState.isMophMode && appState.activeMophIndicator === 'iron-supplement') {
         const labStatusCol = 'lab_result_status';
         const anemiaCol = 'anemea';
 
@@ -1300,61 +1353,108 @@ function renderKPIs() {
     const rows = appState.filteredData;
 
     if (appState.isMophMode) {
-        // --- MOPH Specialized HDC Analytics ---
-        const totalTarget = rows.length;
 
-        // Denominator logic: received = column 'result' is dispensing
-        const receivedRows = rows.filter(r => isReceivedValue(r['result']));
-        const totalReceived = receivedRows.length;
+        if (appState.activeMophIndicator === 'anemia-12m') {
+            // --- MOPH Indicator: ร้อยละเด็กอายุครบ 12 เดือน มีภาวะโลหิตจาง ---
+            // rows already filtered to age 9-15 months
+            const totalChildren = rows.length;
+            const testedRows = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1);
+            const totalTested = testedRows.length;
+            const totalAnemia = testedRows.filter(r => cleanNumericValue(r['anemea']) > 0).length;
+            const totalNormal = totalTested - totalAnemia;
 
-        const coverageRate = totalTarget > 0 ? (totalReceived / totalTarget * 100) : 0;
+            const screeningRate = totalChildren > 0 ? (totalTested / totalChildren * 100) : 0;
+            const anemiaRate = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
 
-        // Anemia and HCT screening rates calculation
-        const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
-        const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
+            // 1. KPI: เด็กอายุครบ 12 เดือน
+            document.getElementById('kpi-1-title').textContent = "เด็กอายุครบ 12 เดือน (9-15 เดือน)";
+            document.getElementById('kpi-total-rows').textContent = totalChildren.toLocaleString();
+            document.getElementById('kpi-1-subtitle').innerHTML = `<i data-lucide="baby"></i> ทั้งหมดในเขตรับผิดชอบ`;
 
-        const testedRate = totalTarget > 0 ? (totalTested / totalTarget * 100) : 0;
-        const anemiaPrevalence = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
+            // 2. KPI: ได้รับการตรวจ HCT/Hb (ตัวส่วน)
+            document.getElementById('kpi-sum-title').textContent = "ได้รับการตรวจ HCT/Hb (ตัวส่วน)";
+            document.getElementById('kpi-total-sum').textContent = totalTested.toLocaleString();
+            document.getElementById('kpi-sum-subtitle').innerHTML = `<i data-lucide="activity"></i> อัตราตรวจคัดกรอง ${screeningRate.toFixed(1)}%`;
 
-        // 1. KPI Target Card
-        document.getElementById('kpi-1-title').textContent = "เด็กกลุ่มเป้าหมาย (ราย)";
-        document.getElementById('kpi-total-rows').textContent = totalTarget.toLocaleString();
-        
-        let ageLabel = "อายุ 6 เดือน - 5 ปี";
-        if (appState.activeAgeFilter === '6-12') {
-            ageLabel = "อายุ 6 - 12 เดือน";
-        } else if (appState.activeAgeFilter === '36-60') {
-            ageLabel = "อายุ 3 - 5 ปี";
-        }
-        document.getElementById('kpi-1-subtitle').innerHTML = `<i data-lucide="baby"></i> ${ageLabel}`;
+            // 3. KPI: ร้อยละโลหิตจาง (ตัวชี้วัดหลัก เป้าหมาย ≤12%)
+            document.getElementById('kpi-avg-title').textContent = "ร้อยละเด็กมีภาวะโลหิตจาง";
+            document.getElementById('kpi-total-avg').textContent = anemiaRate.toFixed(1) + "%";
 
-        // 2. KPI Received Card
-        document.getElementById('kpi-sum-title').textContent = "ได้รับธาตุเหล็ก (ราย)";
-        document.getElementById('kpi-total-sum').textContent = totalReceived.toLocaleString();
-        document.getElementById('kpi-sum-subtitle').innerHTML = `<i data-lucide="check-circle-2"></i> ได้รับยาน้ำครบตามเกณฑ์`;
+            const targetBadge = document.getElementById('moph-target-badge');
+            if (anemiaRate <= 12.0 && totalTested > 0) {
+                document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (≤12%)`;
+                targetBadge.className = "target-badge met";
+                targetBadge.innerHTML = `บรรลุเป้าหมาย: ${anemiaRate.toFixed(1)}%`;
+            } else {
+                document.getElementById('kpi-avg-subtitle').className = "kpi-trend negative";
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="alert-triangle"></i> สูงกว่าเกณฑ์เป้าหมาย (>12%)`;
+                targetBadge.className = "target-badge";
+                targetBadge.innerHTML = `เป้าหมาย ≤12% | ปัจจุบัน ${anemiaRate.toFixed(1)}%`;
+            }
 
-        // 3. KPI Coverage Rate Percentage Card
-        document.getElementById('kpi-avg-title').textContent = "ร้อยละเด็กได้รับธาตุเหล็ก";
-        document.getElementById('kpi-total-avg').textContent = coverageRate.toFixed(1) + "%";
+            // 4. KPI: มีภาวะโลหิตจาง (ตัวเศษ)
+            document.getElementById('kpi-4-title').textContent = "มีภาวะโลหิตจาง (ตัวเศษ)";
+            document.getElementById('kpi-unique-categories').textContent = totalAnemia.toLocaleString();
+            document.getElementById('kpi-4-subtitle').innerHTML = `<i data-lucide="heart-pulse"></i> ปกติ (Normal) ${totalNormal} ราย`;
 
-        // MOPH Target Threshold = 75.0%
-        const targetBadge = document.getElementById('moph-target-badge');
-        if (coverageRate >= 75.0) {
-            document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
-            document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (>=75%)`;
-            targetBadge.className = "target-badge met";
-            targetBadge.innerHTML = `บรรลุเป้าหมาย: ${coverageRate.toFixed(1)}%`;
         } else {
-            document.getElementById('kpi-avg-subtitle').className = "kpi-trend negative";
-            document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="alert-triangle"></i> ต่ำกว่าเกณฑ์เป้าหมาย`;
-            targetBadge.className = "target-badge";
-            targetBadge.innerHTML = `เป้าหมาย 75% | ปัจจุบัน ${coverageRate.toFixed(1)}%`;
-        }
+            // --- MOPH Specialized HDC Analytics: ยาเสริมธาตุเหล็ก ---
+            const totalTarget = rows.length;
 
-        // 4. KPI Anemia Rate / HCT Card
-        document.getElementById('kpi-4-title').textContent = "ร้อยละการเจาะ Lab HCT";
-        document.getElementById('kpi-unique-categories').textContent = testedRate.toFixed(1) + "%";
-        document.getElementById('kpi-4-subtitle').innerHTML = `<i data-lucide="heart-pulse"></i> เจาะแล้วซีด (Anemia) ${totalAnemia} ราย (${anemiaPrevalence.toFixed(1)}%)`;
+            // Denominator logic: received = column 'result' is dispensing
+            const receivedRows = rows.filter(r => isReceivedValue(r['result']));
+            const totalReceived = receivedRows.length;
+
+            const coverageRate = totalTarget > 0 ? (totalReceived / totalTarget * 100) : 0;
+
+            // Anemia and HCT screening rates calculation
+            const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+            const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
+
+            const testedRate = totalTarget > 0 ? (totalTested / totalTarget * 100) : 0;
+            const anemiaPrevalence = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
+
+            // 1. KPI Target Card
+            document.getElementById('kpi-1-title').textContent = "เด็กกลุ่มเป้าหมาย (ราย)";
+            document.getElementById('kpi-total-rows').textContent = totalTarget.toLocaleString();
+
+            let ageLabel = "อายุ 6 เดือน - 5 ปี";
+            if (appState.activeAgeFilter === '6-12') {
+                ageLabel = "อายุ 6 - 12 เดือน";
+            } else if (appState.activeAgeFilter === '36-60') {
+                ageLabel = "อายุ 3 - 5 ปี";
+            }
+            document.getElementById('kpi-1-subtitle').innerHTML = `<i data-lucide="baby"></i> ${ageLabel}`;
+
+            // 2. KPI Received Card
+            document.getElementById('kpi-sum-title').textContent = "ได้รับธาตุเหล็ก (ราย)";
+            document.getElementById('kpi-total-sum').textContent = totalReceived.toLocaleString();
+            document.getElementById('kpi-sum-subtitle').innerHTML = `<i data-lucide="check-circle-2"></i> ได้รับยาน้ำครบตามเกณฑ์`;
+
+            // 3. KPI Coverage Rate Percentage Card
+            document.getElementById('kpi-avg-title').textContent = "ร้อยละเด็กได้รับธาตุเหล็ก";
+            document.getElementById('kpi-total-avg').textContent = coverageRate.toFixed(1) + "%";
+
+            // MOPH Target Threshold = 75.0%
+            const targetBadge = document.getElementById('moph-target-badge');
+            if (coverageRate >= 75.0) {
+                document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (>=75%)`;
+                targetBadge.className = "target-badge met";
+                targetBadge.innerHTML = `บรรลุเป้าหมาย: ${coverageRate.toFixed(1)}%`;
+            } else {
+                document.getElementById('kpi-avg-subtitle').className = "kpi-trend negative";
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="alert-triangle"></i> ต่ำกว่าเกณฑ์เป้าหมาย`;
+                targetBadge.className = "target-badge";
+                targetBadge.innerHTML = `เป้าหมาย 75% | ปัจจุบัน ${coverageRate.toFixed(1)}%`;
+            }
+
+            // 4. KPI Anemia Rate / HCT Card
+            document.getElementById('kpi-4-title').textContent = "ร้อยละการเจาะ Lab HCT";
+            document.getElementById('kpi-unique-categories').textContent = testedRate.toFixed(1) + "%";
+            document.getElementById('kpi-4-subtitle').innerHTML = `<i data-lucide="heart-pulse"></i> เจาะแล้วซีด (Anemia) ${totalAnemia} ราย (${anemiaPrevalence.toFixed(1)}%)`;
+        }
 
     } else {
         // --- Generic Multi-dimensional Dashboard ---
@@ -1407,6 +1507,11 @@ function renderCharts() {
 
 // --- Specialized MOPH Charts Renderer ---
 function renderMophModeCharts(rows) {
+    if (appState.activeMophIndicator === 'anemia-12m') {
+        renderAnemia12mCharts(rows);
+        return;
+    }
+
     // Override standard titles
     document.getElementById('chart-area-title').innerHTML = `<i data-lucide="trending-up"></i> ความครอบคลุมและการเจาะ HCT ตามช่วงอายุ (Coverage & HCT Lab Trend)`;
     document.getElementById('chart-donut-title').innerHTML = `<i data-lucide="pie-chart"></i> สัดส่วนความครอบคลุมและภาวะซีดในการเจาะ Lab (HCT & Anemia Distribution)`;
@@ -1735,6 +1840,141 @@ function renderMophModeCharts(rows) {
         charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions);
         charts.radar.render();
     }
+}
+
+// --- MOPH Indicator: ร้อยละเด็กอายุครบ 12 เดือน มีภาวะโลหิตจาง ---
+function renderAnemia12mCharts(rows) {
+    document.getElementById('chart-bar-title').innerHTML = `<i data-lucide="bar-chart-4"></i> ร้อยละภาวะโลหิตจางรายหน่วยบริการ (เป้าหมาย ≤12%)`;
+    document.getElementById('chart-donut-title').innerHTML = `<i data-lucide="pie-chart"></i> สัดส่วนภาวะโลหิตจาง (เด็กอายุครบ 12 เดือน)`;
+    document.getElementById('chart-area-title').innerHTML = `<i data-lucide="trending-up"></i> จำนวนเด็กอายุครบ 12 เดือน รายหน่วยบริการ (ตัวส่วน vs ตัวเศษ)`;
+    document.getElementById('chart-radar-title').innerHTML = `<i data-lucide="activity"></i> เปรียบเทียบอัตราโลหิตจางรายอำเภอ`;
+    lucide.createIcons();
+
+    // --- Hospital anemia data ---
+    const hospMap = {};
+    rows.forEach(r => {
+        const hosp = String(r['hosname'] || 'ไม่ทราบหน่วยงาน');
+        if (!hospMap[hosp]) hospMap[hosp] = { total: 0, tested: 0, anemia: 0 };
+        hospMap[hosp].total++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) {
+            hospMap[hosp].tested++;
+            if (cleanNumericValue(r['anemea']) > 0) hospMap[hosp].anemia++;
+        }
+    });
+
+    // Sort by anemia rate descending (worst first)
+    const hospitals = Object.keys(hospMap)
+        .filter(h => hospMap[h].tested > 0)
+        .sort((a, b) => {
+            const rA = hospMap[a].anemia / hospMap[a].tested * 100;
+            const rB = hospMap[b].anemia / hospMap[b].tested * 100;
+            return rB - rA;
+        }).slice(0, 15);
+
+    const anemiaRates = hospitals.map(h => parseFloat((hospMap[h].anemia / hospMap[h].tested * 100).toFixed(1)));
+
+    // 1. BAR CHART: Anemia rate per hospital
+    const barOptions = {
+        series: [{ name: 'ร้อยละภาวะโลหิตจาง', data: anemiaRates }],
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        theme: { mode: 'light' },
+        colors: ['#dc2626'],
+        plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '70%' } },
+        xaxis: {
+            categories: hospitals.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.')),
+            min: 0, max: 100,
+            labels: { formatter: val => val + "%" }
+        },
+        annotations: { xaxis: [{ x: 12, borderColor: '#00ff87', borderWidth: 2, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ (12%)' } }] },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
+        tooltip: {
+            theme: 'light',
+            y: { formatter: (val, { dataPointIndex }) => {
+                const h = hospitals[dataPointIndex];
+                return `${val}% (ซีด ${hospMap[h].anemia} จากที่เจาะ ${hospMap[h].tested} คน)`;
+            }}
+        }
+    };
+    if (charts.bar) { charts.bar.updateOptions(barOptions); }
+    else { charts.bar = new ApexCharts(document.getElementById('chart-bar'), barOptions); charts.bar.render(); }
+
+    // 2. DONUT CHART: Anemia vs Normal vs Untested
+    const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && cleanNumericValue(r['anemea']) > 0).length;
+    const totalNormal = totalTested - totalAnemia;
+    const totalUntested = rows.length - totalTested;
+    const anemiaRateOverall = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
+
+    const donutOptions = {
+        series: [totalNormal, totalAnemia, totalUntested],
+        chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#475569' },
+        theme: { mode: 'light' },
+        colors: ['#16a34a', '#dc2626', 'rgba(100,116,139,0.3)'],
+        labels: ['ตรวจแล้วปกติ', 'ตรวจแล้วมีภาวะโลหิตจาง', 'ยังไม่ได้ตรวจ'],
+        plotOptions: { pie: { donut: { size: '65%', labels: { show: true, name: { show: true, fontSize: '11px' }, value: { show: true, fontSize: '15px', fontWeight: 'bold', formatter: val => val.toLocaleString() + ' ราย' }, total: { show: true, label: 'ร้อยละซีด', fontSize: '10px', formatter: () => anemiaRateOverall.toFixed(1) + "%" } } } } },
+        dataLabels: { enabled: true },
+        legend: { position: 'bottom', fontSize: '9px' },
+        tooltip: { theme: 'light' }
+    };
+    if (charts.donut) { charts.donut.updateOptions(donutOptions); }
+    else { charts.donut = new ApexCharts(document.getElementById('chart-donut'), donutOptions); charts.donut.render(); }
+
+    // 3. AREA/BAR CHART: Tested vs Anemia count per hospital (stacked)
+    const hospAllSorted = Object.keys(hospMap)
+        .filter(h => hospMap[h].total > 0)
+        .sort((a, b) => hospMap[b].total - hospMap[a].total)
+        .slice(0, 15);
+    const areaOptions = {
+        series: [
+            { name: 'เจาะ Lab แล้ว (ตัวส่วน)', data: hospAllSorted.map(h => hospMap[h].tested) },
+            { name: 'มีภาวะโลหิตจาง (ตัวเศษ)', data: hospAllSorted.map(h => hospMap[h].anemia) }
+        ],
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: true } },
+        theme: { mode: 'light' },
+        colors: ['#0284c7', '#dc2626'],
+        plotOptions: { bar: { horizontal: false, columnWidth: '60%', borderRadius: 3 } },
+        xaxis: {
+            categories: hospAllSorted.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.')),
+            labels: { rotate: -45, style: { fontSize: '9px' } }
+        },
+        yaxis: { title: { text: 'จำนวน (ราย)' } },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
+        tooltip: { theme: 'light', y: { formatter: val => val.toLocaleString() + ' ราย' } }
+    };
+    if (charts.area) { charts.area.updateOptions(areaOptions); }
+    else { charts.area = new ApexCharts(document.getElementById('chart-area'), areaOptions); charts.area.render(); }
+
+    // 4. BAR CHART: Anemia rate per district (Amphur)
+    const ampMap = {};
+    rows.forEach(r => {
+        const amp = String(r['amp_name'] || r['ampname'] || 'ไม่ทราบอำเภอ');
+        if (!ampMap[amp]) ampMap[amp] = { tested: 0, anemia: 0 };
+        if (cleanNumericValue(r['lab_result_status']) === 1) {
+            ampMap[amp].tested++;
+            if (cleanNumericValue(r['anemea']) > 0) ampMap[amp].anemia++;
+        }
+    });
+    const amps = Object.keys(ampMap).filter(a => ampMap[a].tested > 0);
+    const ampRates = amps.map(a => parseFloat((ampMap[a].anemia / ampMap[a].tested * 100).toFixed(1)));
+
+    const radarOptions = {
+        series: [{ name: 'ร้อยละโลหิตจาง', data: ampRates }],
+        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        theme: { mode: 'light' },
+        colors: ['#f59e0b'],
+        plotOptions: { bar: { columnWidth: '50%', borderRadius: 4, dataLabels: { position: 'top' } } },
+        dataLabels: { enabled: true, formatter: val => val + "%", offsetY: -18, style: { fontSize: '11px', colors: ['#b45309'] } },
+        xaxis: { categories: amps, labels: { style: { fontSize: '11px', fontWeight: 'bold' } } },
+        yaxis: { min: 0, labels: { formatter: val => val + "%" } },
+        annotations: { yaxis: [{ y: 12, borderColor: '#00ff87', borderWidth: 2, strokeDashArray: 4, label: { borderColor: '#00ff87', style: { color: '#060913', background: '#00ff87', fontWeight: 'bold' }, text: 'เกณฑ์ 12%' } }] },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' },
+        tooltip: { theme: 'light', y: { formatter: (val, { dataPointIndex }) => {
+            const a = amps[dataPointIndex];
+            return `${val}% (ซีด ${ampMap[a].anemia} จากที่เจาะ ${ampMap[a].tested} คน)`;
+        }}}
+    };
+    if (charts.radar) { charts.radar.updateOptions(radarOptions); }
+    else { charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions); charts.radar.render(); }
 }
 
 // --- Generic Multi-dimensional Chart Rendering ---
