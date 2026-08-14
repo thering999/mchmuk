@@ -1287,12 +1287,37 @@ function applyAllFilters() {
                     console.log('[cohort debug] cohortStart:', cohortStart, 'cohortEnd:', cohortEnd);
                     console.log('[cohort debug] sample birth raw:', sample.map(r => r['birth']));
                     console.log('[cohort debug] sample birth parsed:', sample.map(r => parseBirth(r['birth'])));
+                    // Step 1: cohort filter by birth date
                     filtered = filtered.filter(row => {
                         const birthDate = parseBirth(row['birth']);
                         if (!birthDate) return false;
                         return birthDate >= cohortStart && birthDate <= cohortEnd;
                     });
                     console.log('[cohort debug] after filter count:', filtered.length);
+
+                    // Step 2: dedup by CID + lab window (birth+6m to birth+13m-1d)
+                    const cidMap = new Map();
+                    filtered.forEach(row => {
+                        const cid = row['cid'] || row['pid'] || row['hoscode'] + '_' + row['age_m'];
+                        const birthDate = parseBirth(row['birth']);
+                        if (!cidMap.has(cid)) {
+                            cidMap.set(cid, { ...row, _hasLab: false, _isAnemic: false });
+                        }
+                        const entry = cidMap.get(cid);
+                        if (cleanNumericValue(row['lab_result_status']) === 1 && birthDate) {
+                            const labDate = parseBirth(row['lab_date']);
+                            if (labDate) {
+                                const wStart = new Date(birthDate); wStart.setMonth(wStart.getMonth() + 6);
+                                const wEnd   = new Date(birthDate); wEnd.setMonth(wEnd.getMonth() + 13); wEnd.setDate(wEnd.getDate() - 1);
+                                if (labDate >= wStart && labDate <= wEnd) {
+                                    entry._hasLab = true;
+                                    if (isAnemicRow(row)) entry._isAnemic = true;
+                                }
+                            }
+                        }
+                    });
+                    filtered = [...cidMap.values()];
+                    console.log('[cohort debug] after dedup CID count:', filtered.length);
                 } else {
                     // fallback: estimate from age_m
                     const refDate = appState.exportDate || new Date();
@@ -1475,9 +1500,9 @@ function renderKPIs() {
             // --- MOPH Indicator: ร้อยละเด็กอายุครบ 12 เดือน มีภาวะโลหิตจาง ---
             // rows already filtered to age 9-15 months
             const totalChildren = rows.length;
-            const testedRows = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1);
+            const testedRows = rows.filter(r => r._hasLab);
             const totalTested = testedRows.length;
-            const totalAnemia = testedRows.filter(r => isAnemicRow(r)).length;
+            const totalAnemia = rows.filter(r => r._isAnemic).length;
             const totalNormal = totalTested - totalAnemia;
 
             const screeningRate = totalChildren > 0 ? (totalTested / totalChildren * 100) : 0;
@@ -1970,7 +1995,7 @@ function renderAnemia12mCharts(rows) {
     lucide.createIcons();
 
     // Empty state: ไม่มีข้อมูล lab HCT/Hb ในช่วงอายุ 6-12 เดือน
-    const hasLabData = rows.some(r => cleanNumericValue(r['lab_result_status']) === 1);
+    const hasLabData = rows.some(r => r._hasLab);
     if (rows.length === 0 || !hasLabData) {
         const noDataMsg = `<div style="display:flex;align-items:center;justify-content:center;height:100%;min-height:160px;flex-direction:column;gap:12px;color:var(--text-muted);">
             <i data-lucide="flask-conical-off" style="width:40px;height:40px;opacity:0.4;"></i>
@@ -1993,9 +2018,9 @@ function renderAnemia12mCharts(rows) {
         const hosp = String(r['hosname'] || 'ไม่ทราบหน่วยงาน');
         if (!hospMap[hosp]) hospMap[hosp] = { total: 0, tested: 0, anemia: 0 };
         hospMap[hosp].total++;
-        if (cleanNumericValue(r['lab_result_status']) === 1) {
+        if (r._hasLab) {
             hospMap[hosp].tested++;
-            if (isAnemicRow(r)) hospMap[hosp].anemia++;
+            if (r._isAnemic) hospMap[hosp].anemia++;
         }
     });
 
@@ -2049,8 +2074,8 @@ function renderAnemia12mCharts(rows) {
     else { charts.bar = new ApexCharts(document.getElementById('chart-bar'), barOptions); charts.bar.render(); }
 
     // 2. DONUT CHART: ปกติ(เขียว) / ซีด(แดง) / ยังไม่ตรวจ(เทา)
-    const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
-    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
+    const totalTested = rows.filter(r => r._hasLab).length;
+    const totalAnemia = rows.filter(r => r._isAnemic).length;
     const totalNormal = totalTested - totalAnemia;
     const totalUntested = rows.length - totalTested;
     const anemiaRateOverall = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
@@ -2113,9 +2138,9 @@ function renderAnemia12mCharts(rows) {
     rows.forEach(r => {
         const amp = String(r['amp_name'] || r['ampname'] || 'ไม่ทราบอำเภอ');
         if (!ampMap[amp]) ampMap[amp] = { tested: 0, anemia: 0 };
-        if (cleanNumericValue(r['lab_result_status']) === 1) {
+        if (r._hasLab) {
             ampMap[amp].tested++;
-            if (isAnemicRow(r)) ampMap[amp].anemia++;
+            if (r._isAnemic) ampMap[amp].anemia++;
         }
     });
     const amps = Object.keys(ampMap).filter(a => ampMap[a].tested > 0).sort((a, b) => {
