@@ -1280,11 +1280,17 @@ function applyAllFilters() {
                         }
                         return null;
                     };
+                    // DEBUG: log sample to console
+                    const sample = filtered.slice(0, 3);
+                    console.log('[cohort debug] cohortStart:', cohortStart, 'cohortEnd:', cohortEnd);
+                    console.log('[cohort debug] sample birth raw:', sample.map(r => r['birth']));
+                    console.log('[cohort debug] sample birth parsed:', sample.map(r => parseBirth(r['birth'])));
                     filtered = filtered.filter(row => {
                         const birthDate = parseBirth(row['birth']);
                         if (!birthDate) return false;
                         return birthDate >= cohortStart && birthDate <= cohortEnd;
                     });
+                    console.log('[cohort debug] after filter count:', filtered.length);
                 } else {
                     // fallback: estimate from age_m
                     const refDate = appState.exportDate || new Date();
