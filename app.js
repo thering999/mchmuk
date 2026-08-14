@@ -1258,6 +1258,8 @@ function applyAllFilters() {
                 if (hasBirth) {
                     const parseBirth = (val) => {
                         if (val === undefined || val === null || val === '') return null;
+                        // Already a JS Date (xlsx auto-converted)
+                        if (val instanceof Date) return val;
                         const strVal = String(val).trim();
                         // Excel serial: numeric value 10000–99999 (covers dates ~1927–2173)
                         const num = parseFloat(strVal);
