@@ -455,6 +455,14 @@
                 </button>
             </div>
 
+            <!-- Disclaimer anemia-12m (Visible only in anemia-12m mode) -->
+            <div id="moph-anemia-disclaimer" style="display: none; padding: 8px 14px; background: rgba(100,116,139,0.07); border: 1px solid rgba(100,116,139,0.2); border-radius: 8px; font-size: 0.78rem; color: var(--text-muted); line-height: 1.5;">
+                <strong style="color:var(--text-secondary);">⚠ หมายเหตุ:</strong>
+                ข้อมูลนี้คำนวณจากไฟล์ Export ตัวชี้วัดยาเสริมธาตุเหล็ก (ไม่ใช่ไฟล์ตัวชี้วัดโลหิตจางโดยตรง)
+                ตัวเลขอาจต่างจาก HDC เนื่องจาก (1) ครอบคลุมเฉพาะเด็กที่มีประวัติ Iron Supplement
+                (2) ไม่มีการ exclude ICD10 กลุ่มโรคติดเชื้อ/โลหิตวิทยา (r_icd) ตามนิยาม HDC
+            </div>
+
             <!-- Fiscal Year & Export Date (Visible only in anemia-12m mode) -->
             <div id="moph-cohort-controls" style="display: none; align-items: center; gap: 16px; padding: 10px 14px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 0.85rem; color: var(--text-secondary);">
                 <i data-lucide="calendar-range" style="width:16px;height:16px;color:#d97706;flex-shrink:0;"></i>

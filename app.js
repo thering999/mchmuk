@@ -410,6 +410,8 @@ function initMophIndicatorTabs() {
                 if (hctFilters) hctFilters.style.display = 'flex';
                 const cohortControls = document.getElementById('moph-cohort-controls');
                 if (cohortControls) cohortControls.style.display = 'none';
+                const disclaimer = document.getElementById('moph-anemia-disclaimer');
+                if (disclaimer) disclaimer.style.display = 'none';
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
                     'ร้อยละของเด็กอายุ 6 เดือน – 5 ปี ได้รับยาน้ำเสริมธาตุเหล็ก (เป้าหมาย: ร้อยละ 75.0 ขึ้นไป)';
@@ -418,6 +420,8 @@ function initMophIndicatorTabs() {
                 if (hctFilters) hctFilters.style.display = 'none';
                 const cohortControls = document.getElementById('moph-cohort-controls');
                 if (cohortControls) cohortControls.style.display = 'flex';
+                const disclaimer = document.getElementById('moph-anemia-disclaimer');
+                if (disclaimer) disclaimer.style.display = 'block';
                 updateCohortHint();
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
@@ -3043,4 +3047,3 @@ function refreshBatchList() {}
 function loadLatestActiveBatch() {}
 async function saveActiveDataset() { return { ok: true }; }
 async function getActiveDataset() { return null; }
-// Sat, Aug 15, 2026  9:37:23 AM
