@@ -1295,29 +1295,27 @@ function applyAllFilters() {
                     });
                     console.log('[cohort debug] after filter count:', filtered.length);
 
-                    // Step 2: dedup by CID + lab window (birth+6m to birth+13m-1d)
-                    const cidMap = new Map();
+                    // Tag rows with lab window and anemia flags (lab_date within birth+6m to birth+13m-1d)
                     filtered.forEach(row => {
-                        const cid = row['cid'] || row['pid'] || row['hoscode'] + '_' + row['age_m'];
                         const birthDate = parseBirth(row['birth']);
-                        if (!cidMap.has(cid)) {
-                            cidMap.set(cid, { ...row, _hasLab: false, _isAnemic: false });
-                        }
-                        const entry = cidMap.get(cid);
+                        row._hasLab = false;
+                        row._isAnemic = false;
                         if (cleanNumericValue(row['lab_result_status']) === 1 && birthDate) {
                             const labDate = parseBirth(row['lab_date']);
                             if (labDate) {
                                 const wStart = new Date(birthDate); wStart.setMonth(wStart.getMonth() + 6);
                                 const wEnd   = new Date(birthDate); wEnd.setMonth(wEnd.getMonth() + 13); wEnd.setDate(wEnd.getDate() - 1);
                                 if (labDate >= wStart && labDate <= wEnd) {
-                                    entry._hasLab = true;
-                                    if (isAnemicRow(row)) entry._isAnemic = true;
+                                    row._hasLab = true;
+                                    if (isAnemicRow(row)) row._isAnemic = true;
                                 }
+                            } else {
+                                // No lab_date → accept lab at face value (export pre-filtered)
+                                row._hasLab = true;
+                                if (isAnemicRow(row)) row._isAnemic = true;
                             }
                         }
                     });
-                    filtered = [...cidMap.values()];
-                    console.log('[cohort debug] after dedup CID count:', filtered.length);
                 } else {
                     // fallback: estimate from age_m
                     const refDate = appState.exportDate || new Date();
@@ -3045,4 +3043,3 @@ function refreshBatchList() {}
 function loadLatestActiveBatch() {}
 async function saveActiveDataset() { return { ok: true }; }
 async function getActiveDataset() { return null; }
-// deploy Fri, Aug 14, 2026  8:01:28 PM
