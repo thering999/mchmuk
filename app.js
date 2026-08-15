@@ -421,7 +421,7 @@ function initMophIndicatorTabs() {
                 updateCohortHint();
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
-                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (เป้าหมาย: ไม่เกินร้อยละ 12)';
+                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (Coverage) — เป้าหมาย ≤17% (ปี 2569), ≤16% (ปี 2570)';
             }
 
             applyAllFilters();
@@ -1506,18 +1506,18 @@ function renderKPIs() {
             const screeningRate = totalChildren > 0 ? (totalTested / totalChildren * 100) : 0;
             const anemiaRate = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
 
-            // 1. KPI: เด็กอายุครบ 12 เดือน
-            document.getElementById('kpi-1-title').textContent = "เด็กอายุครบ 12 เดือน (6-12 เดือน)";
+            // 1. KPI: C = จำนวนเด็กอายุครบ 12 เดือน ในเขตรับผิดชอบทั้งหมด
+            document.getElementById('kpi-1-title').textContent = "เด็กอายุครบ 12 เดือน ในเขตรับผิดชอบ [C]";
             document.getElementById('kpi-total-rows').textContent = totalChildren.toLocaleString();
             document.getElementById('kpi-1-subtitle').innerHTML = `<i data-lucide="baby"></i> ทั้งหมดในเขตรับผิดชอบ`;
 
-            // 2. KPI: ได้รับการตรวจ HCT/Hb (ตัวส่วน)
-            document.getElementById('kpi-sum-title').textContent = "ได้รับการตรวจ HCT/Hb (ตัวส่วน)";
+            // 2. KPI: B = ได้รับการตรวจภาวะโลหิตจาง ช่วงอายุ 6-12 เดือน (ตัวส่วน)
+            document.getElementById('kpi-sum-title').textContent = "ได้รับการตรวจภาวะโลหิตจาง [B]";
             document.getElementById('kpi-total-sum').textContent = totalTested.toLocaleString();
             document.getElementById('kpi-sum-subtitle').innerHTML = `<i data-lucide="activity"></i> อัตราตรวจคัดกรอง ${screeningRate.toFixed(1)}%`;
 
-            // 3. KPI: ร้อยละโลหิตจาง (ตัวชี้วัดหลัก เป้าหมาย ≤12%)
-            document.getElementById('kpi-avg-title').textContent = "ร้อยละเด็กมีภาวะโลหิตจาง";
+            // 3. KPI: A/B×100 = ร้อยละโลหิตจาง (ตัวชี้วัดหลัก)
+            document.getElementById('kpi-avg-title').textContent = "ร้อยละโลหิตจาง [A/B×100]";
             document.getElementById('kpi-total-avg').textContent = anemiaRate.toFixed(1) + "%";
 
             // เป้าหมาย ปี 2569=≤17%, ปี 2570=≤16% (ใช้ ≤17% เป็น default ปีปัจจุบัน)
@@ -1535,8 +1535,8 @@ function renderKPIs() {
                 targetBadge.innerHTML = `เป้าหมาย ≤${anemiaTarget}% | ปัจจุบัน ${anemiaRate.toFixed(1)}%`;
             }
 
-            // 4. KPI: มีภาวะโลหิตจาง (ตัวเศษ)
-            document.getElementById('kpi-4-title').textContent = "มีภาวะโลหิตจาง (ตัวเศษ)";
+            // 4. KPI: A = พบภาวะโลหิตจาง (ตัวเศษ)
+            document.getElementById('kpi-4-title').textContent = "พบภาวะโลหิตจาง [A]";
             document.getElementById('kpi-unique-categories').textContent = totalAnemia.toLocaleString();
             document.getElementById('kpi-4-subtitle').innerHTML = `<i data-lucide="heart-pulse"></i> ปกติ (Normal) ${totalNormal} ราย`;
 
