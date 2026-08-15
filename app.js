@@ -1805,7 +1805,7 @@ function renderMophModeCharts(rows) {
             }
         },
         dataLabels: { enabled: true },
-        legend: { position: 'bottom', fontSize: '9px', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
+        legend: { position: 'bottom', fontSize: '9px', markers: { size: 8, shape: 'circle', strokeWidth: 0, offsetY: 1 } },
         tooltip: { theme: 'light' }
     };
 
@@ -2053,7 +2053,7 @@ function renderAnemia12mCharts(rows) {
             categories: hospLabels,
             labels: { formatter: val => val.toLocaleString() + ' ราย' }
         },
-        legend: { position: 'top', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
+        legend: { position: 'top', markers: { size: 8, shape: 'circle', strokeWidth: 0, offsetY: 1 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
             theme: 'light',
@@ -2097,7 +2097,7 @@ function renderAnemia12mCharts(rows) {
             const count = w.config.series[seriesIndex];
             return count > 0 ? count.toLocaleString() + ' ราย' : '';
         }},
-        legend: { position: 'bottom', fontSize: '10px', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
+        legend: { position: 'bottom', fontSize: '10px', markers: { size: 8, shape: 'circle', strokeWidth: 0, offsetY: 1 } },
         tooltip: { theme: 'light', y: { formatter: val => val.toLocaleString() + ' ราย' } }
     };
     if (charts.donut) { charts.donut.updateOptions(donutOptions); }
@@ -2122,7 +2122,7 @@ function renderAnemia12mCharts(rows) {
             labels: { rotate: -45, style: { fontSize: '9px' } }
         },
         yaxis: { title: { text: 'จำนวน (ราย)' } },
-        legend: { position: 'top', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
+        legend: { position: 'top', markers: { size: 8, shape: 'circle', strokeWidth: 0, offsetY: 1 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: { theme: 'light', shared: true, y: { formatter: (val, { seriesIndex, dataPointIndex }) => {
             const h = hospAllSorted[dataPointIndex];
@@ -2160,7 +2160,7 @@ function renderAnemia12mCharts(rows) {
         plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
         xaxis: { categories: amps, labels: { style: { fontSize: '11px', fontWeight: 'bold' } } },
         yaxis: { title: { text: 'จำนวน (ราย)' } },
-        legend: { position: 'top', markers: { width: 10, height: 10, radius: 5, strokeWidth: 0 } },
+        legend: { position: 'top', markers: { size: 8, shape: 'circle', strokeWidth: 0, offsetY: 1 } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         dataLabels: { enabled: true, formatter: (val, { seriesIndex, dataPointIndex }) => {
             if (seriesIndex !== 1) return '';
@@ -3047,4 +3047,3 @@ function refreshBatchList() {}
 function loadLatestActiveBatch() {}
 async function saveActiveDataset() { return { ok: true }; }
 async function getActiveDataset() { return null; }
-// Sat, Aug 15, 2026  9:43:24 AM

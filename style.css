@@ -1179,3 +1179,11 @@ footer a:hover {
     font-weight: 600;
 }
 
+/* ApexCharts: hide line segment in legend, keep single dot only */
+.apexcharts-legend-series .apexcharts-legend-marker {
+    border-radius: 50% !important;
+}
+.apexcharts-legend-series line {
+    display: none !important;
+}
+
