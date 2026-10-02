@@ -7,7 +7,7 @@
     
     <!-- Custom Vanilla CSS Design System -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="style.css?v=1.5.0">
+    <link rel="stylesheet" href="style.css?v=1.6.0">
     
     <style>
         /* --- Specialized Custom Styles for HDC MOPH Mode --- */
@@ -241,7 +241,7 @@
                 </div>
                 <div class="logo-text">
                     <h1>MCHMUK Analytics</h1>
-                    <span>Holographic Dashboard System v1.5.0</span>
+                    <span>Holographic Dashboard System v1.6.0</span>
                 </div>
             </div>
             <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
@@ -457,7 +457,7 @@
                     <i data-lucide="pill"></i> ยาเสริมธาตุเหล็ก (Coverage ≥75%)
                 </button>
                 <button class="filter-tab-btn" data-indicator="anemia-12m" style="font-size: 0.9rem; padding: 10px 18px;">
-                    <i data-lucide="heart-pulse"></i> โลหิตจาง อายุครบ 12 เดือน (A/B ≤<span id="anemia-tab-target">16</span>%)
+                    <i data-lucide="heart-pulse"></i> <span>โลหิตจาง อายุครบ 12 เดือน (A/B ≤<span id="anemia-tab-target">16</span>%)</span>
                 </button>
             </div>
 
@@ -469,10 +469,10 @@
                 (2) ไม่มีการ exclude ICD10 กลุ่มโรคติดเชื้อ/โลหิตวิทยา (r_icd) ตามนิยาม HDC
             </div>
 
-            <!-- Fiscal Year & Export Date (Visible only in anemia-12m mode) -->
-            <div id="moph-cohort-controls" style="display: none; align-items: center; gap: 16px; padding: 10px 14px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 0.85rem; color: var(--text-secondary);">
+            <!-- Fiscal Year controls (both indicators); export date + cohort hint for anemia-12m, quarter for iron -->
+            <div id="moph-cohort-controls" style="display: none; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 10px 14px; background: rgba(245,158,11,0.06); border: 1px solid rgba(245,158,11,0.2); border-radius: 10px; font-size: 0.85rem; color: var(--text-secondary);">
                 <i data-lucide="calendar-range" style="width:16px;height:16px;color:#d97706;flex-shrink:0;"></i>
-                <span style="font-weight:600; color:#d97706;">Cohort filter</span>
+                <span id="period-controls-title" style="font-weight:600; color:#d97706;">ช่วงเวลา</span>
                 <label style="display:flex;align-items:center;gap:6px;">
                     ปีงบประมาณ
                     <select id="fiscal-year-select" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:var(--surface);color:var(--text-primary);font-size:0.82rem;">
@@ -483,7 +483,17 @@
                         <option value="2571">2571</option>
                     </select>
                 </label>
-                <label style="display:flex;align-items:center;gap:6px;">
+                <label id="quarter-select-wrap" style="display:none;align-items:center;gap:6px;">
+                    ไตรมาส
+                    <select id="quarter-select" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:var(--surface);color:var(--text-primary);font-size:0.82rem;">
+                        <option value="all" selected>ทั้งปี</option>
+                        <option value="1">Q1 (ต.ค.–ธ.ค.)</option>
+                        <option value="2">Q2 (ม.ค.–มี.ค.)</option>
+                        <option value="3">Q3 (เม.ย.–มิ.ย.)</option>
+                        <option value="4">Q4 (ก.ค.–ก.ย.)</option>
+                    </select>
+                </label>
+                <label id="export-date-wrap" style="display:flex;align-items:center;gap:6px;">
                     วันที่ดาวน์โหลดข้อมูล
                     <input type="date" id="export-date-input" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:var(--surface);color:var(--text-primary);font-size:0.82rem;">
                 </label>
@@ -685,7 +695,7 @@
         </div>
 
         <footer>
-            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.5.0 (อัปเดต: 2 ต.ค. 2569) | ☁️ Central GitHub Data Persistence | Built with Premium Custom CSS and Javascript.
+            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.6.0 (อัปเดต: 2 ต.ค. 2569) | ☁️ Central GitHub Data Persistence | Built with Premium Custom CSS and Javascript.
         </footer>
 
     </div>
@@ -705,6 +715,6 @@
     <script src="auth.js?v=1.4.0"></script>
     
     <!-- Main Application Javascript Logic -->
-    <script src="app.js?v=1.5.2"></script>
+    <script src="app.js?v=1.6.1"></script>
 </body>
 </html>

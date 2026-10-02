@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.5.2 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.6.0 Loaded Successfully");
 
 // ==========================================================================
 // ☁️ GitHub Storage Configuration (Central Data Persistence)
@@ -52,6 +52,7 @@ let appState = {
     fiscalYear: 2570,       // Thai fiscal year (ปีงบประมาณ)
     exportDate: null,       // Date object — วันที่ดาวน์โหลดข้อมูล (null = today)
     activeAgeFilter: "all", // all, 6-12, 36-60
+    activeQuarter: "all",   // all | 1-4 (fiscal quarter, iron-supplement mode)
     activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
     activeHospitalFilter: "all",
     activeDistrictFilter: "all",
@@ -71,7 +72,84 @@ const neonColors = ['#0284c7', '#16a34a', '#dc2626', '#0d9488', '#f59e0b', '#636
 
 const isNarrowScreen = () => window.innerWidth < 640;
 
-const ANEMIA_TARGET_BY_FY = { 2569: 17.0, 2570: 16.0, 2571: 15.0 };
+function parseDateValue(val) {
+    if (val === undefined || val === null || val === '') return null;
+    if (val instanceof Date) return isNaN(val) ? null : val;
+    const strVal = String(val).trim();
+    // Excel serial: numeric value 10000–99999 (covers dates ~1927–2173)
+    const num = parseFloat(strVal);
+    if (!isNaN(num) && num > 10000 && num < 100000) {
+        return new Date((num - 25569) * 86400 * 1000);
+    }
+    const thMatch = strVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (thMatch) {
+        let [, d, m, y] = thMatch.map(Number);
+        if (y >= 2500) y -= 543;
+        return new Date(y, m - 1, d);
+    }
+    const isoMatch = strVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+        let [, y, m, d] = isoMatch.map(Number);
+        if (y >= 2500) y -= 543;
+        return new Date(y, m - 1, d);
+    }
+    return null;
+}
+
+// Thai fiscal year starts Oct 1: Oct 2026 belongs to FY2570
+const fiscalYearOf = (date) => date.getFullYear() + 543 + (date.getMonth() >= 9 ? 1 : 0);
+const fiscalQuarterOf = (date) => Math.floor(((date.getMonth() + 3) % 12) / 3) + 1;
+
+function getServiceFiscalYears() {
+    if (!appState.headers.includes('epi_date')) return [];
+    const counts = {};
+    appState.rawData.forEach(row => {
+        const d = parseDateValue(row['epi_date']);
+        if (d) { const fy = fiscalYearOf(d); counts[fy] = (counts[fy] || 0) + 1; }
+    });
+    return Object.keys(counts).map(Number).sort((a, b) => a - b).map(fy => ({ fy, count: counts[fy] }));
+}
+
+// Default the fiscal year to the latest year with substantial service data in the loaded file
+function syncFiscalYearToData() {
+    const years = getServiceFiscalYears();
+    if (!years.length) return;
+    const total = years.reduce((s, y) => s + y.count, 0);
+    const main = years.filter(y => y.count >= total * 0.05);
+    const latest = (main.length ? main : years)[(main.length ? main : years).length - 1].fy;
+    const fySelect = document.getElementById('fiscal-year-select');
+    if (fySelect && !fySelect.querySelector(`option[value="${latest}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = String(latest);
+        opt.textContent = String(latest);
+        fySelect.appendChild(opt);
+        [...fySelect.options].sort((a, b) => a.value - b.value).forEach(o => fySelect.appendChild(o));
+    }
+    appState.fiscalYear = latest;
+    if (fySelect) fySelect.value = String(latest);
+    syncAnemiaTabTarget();
+}
+
+function updatePeriodControls() {
+    const box = document.getElementById('moph-cohort-controls');
+    if (!box) return;
+    box.style.display = appState.isMophMode ? 'flex' : 'none';
+    const isIron = appState.activeMophIndicator === 'iron-supplement';
+    document.getElementById('quarter-select-wrap').style.display = isIron ? 'flex' : 'none';
+    document.getElementById('export-date-wrap').style.display = isIron ? 'none' : 'flex';
+    document.getElementById('period-controls-title').textContent = isIron ? 'ช่วงเวลาให้บริการ' : 'Cohort filter';
+    if (isIron) {
+        const hint = document.getElementById('cohort-age-hint');
+        const years = getServiceFiscalYears();
+        if (hint) hint.textContent = years.length
+            ? `ข้อมูลในไฟล์ (ตาม epi_date): ${years.map(y => `ปีงบ ${y.fy} ${y.count.toLocaleString()} ราย`).join(', ')}`
+            : '⚠ ไม่มีคอลัมน์ epi_date จึงไม่กรองตามปีงบ';
+    } else {
+        updateCohortHint();
+    }
+}
+
+const ANEMIA_TARGET_BY_FY ={ 2569: 17.0, 2570: 16.0, 2571: 15.0 };
 const getAnemiaTarget = (fy) => ANEMIA_TARGET_BY_FY[fy] ?? 16.0;
 function syncAnemiaTabTarget() {
     const el = document.getElementById('anemia-tab-target');
@@ -417,8 +495,7 @@ function initMophIndicatorTabs() {
             if (appState.activeMophIndicator === 'iron-supplement') {
                 if (ageFilters) ageFilters.style.display = 'flex';
                 if (hctFilters) hctFilters.style.display = 'flex';
-                const cohortControls = document.getElementById('moph-cohort-controls');
-                if (cohortControls) cohortControls.style.display = 'none';
+                updatePeriodControls();
                 const disclaimer = document.getElementById('moph-anemia-disclaimer');
                 if (disclaimer) disclaimer.style.display = 'none';
                 // Update banner
@@ -427,11 +504,9 @@ function initMophIndicatorTabs() {
             } else {
                 if (ageFilters) ageFilters.style.display = 'none';
                 if (hctFilters) hctFilters.style.display = 'none';
-                const cohortControls = document.getElementById('moph-cohort-controls');
-                if (cohortControls) cohortControls.style.display = 'flex';
+                updatePeriodControls();
                 const disclaimer = document.getElementById('moph-anemia-disclaimer');
                 if (disclaimer) disclaimer.style.display = 'block';
-                updateCohortHint();
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
                     'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (Coverage) — เป้าหมาย ≤17% (ปี 2569), ≤16% (ปี 2570), ≤15% (ปี 2571)';
@@ -483,7 +558,16 @@ function initCohortControls() {
         fySelect.addEventListener('change', (e) => {
             appState.fiscalYear = parseInt(e.target.value);
             syncAnemiaTabTarget();
-            updateCohortHint();
+            updatePeriodControls();
+            applyAllFilters();
+            triggerAnalyticsUpdate();
+        });
+    }
+    const quarterSelect = document.getElementById('quarter-select');
+    if (quarterSelect) {
+        quarterSelect.addEventListener('change', (e) => {
+            appState.activeQuarter = e.target.value;
+            appState.currentPage = 1;
             applyAllFilters();
             triggerAnalyticsUpdate();
         });
@@ -996,6 +1080,8 @@ function detectMophIronDataset() {
         document.getElementById('moph-indicator-tabs').style.display = 'flex';
         document.getElementById('moph-age-filters').style.display = 'flex';
         document.getElementById('moph-hct-filters').style.display = 'flex';
+        syncFiscalYearToData();
+        updatePeriodControls();
 
         // Reset indicator tab active state to iron-supplement
         document.querySelectorAll('#moph-indicator-tabs .filter-tab-btn').forEach(t => t.classList.remove('active'));
@@ -1012,6 +1098,7 @@ function detectMophIronDataset() {
         document.getElementById('moph-mode-notice').textContent = "📌 วิเคราะห์ในโหมดผู้รับธาตุเหล็ก (MOPH HDC Mode)";
     } else {
         appState.isMophMode = false;
+        updatePeriodControls();
         document.getElementById('moph-banner').style.display = 'none';
         document.getElementById('moph-indicator-tabs').style.display = 'none';
         document.getElementById('moph-age-filters').style.display = 'none';
@@ -1271,32 +1358,7 @@ function applyAllFilters() {
                 const cohortEnd   = new Date(fyEndCE,   8, 30);  // Sep 30
                 const hasBirth = appState.headers.includes('birth');
                 if (hasBirth) {
-                    const parseBirth = (val) => {
-                        if (val === undefined || val === null || val === '') return null;
-                        // Already a JS Date (xlsx auto-converted)
-                        if (val instanceof Date) return val;
-                        const strVal = String(val).trim();
-                        // Excel serial: numeric value 10000–99999 (covers dates ~1927–2173)
-                        const num = parseFloat(strVal);
-                        if (!isNaN(num) && num > 10000 && num < 100000) {
-                            return new Date((num - 25569) * 86400 * 1000);
-                        }
-                        // Thai BE string: DD/MM/YYYY where YYYY >= 2500
-                        const thMatch = strVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-                        if (thMatch) {
-                            let [, d, m, y] = thMatch.map(Number);
-                            if (y >= 2500) y -= 543;
-                            return new Date(y, m - 1, d);
-                        }
-                        // ISO string YYYY-MM-DD
-                        const isoMatch = strVal.match(/^(\d{4})-(\d{2})-(\d{2})/);
-                        if (isoMatch) {
-                            let [, y, m, d] = isoMatch.map(Number);
-                            if (y >= 2500) y -= 543;
-                            return new Date(y, m - 1, d);
-                        }
-                        return null;
-                    };
+                    const parseBirth = parseDateValue;
                     // DEBUG: log sample to console
                     const sample = filtered.slice(0, 3);
                     console.log('[cohort debug] cohortStart:', cohortStart, 'cohortEnd:', cohortEnd);
@@ -1343,6 +1405,15 @@ function applyAllFilters() {
                     });
                 }
             } else {
+                if (appState.headers.includes('epi_date')) {
+                    const fy = appState.fiscalYear;
+                    const q = appState.activeQuarter;
+                    filtered = filtered.filter(row => {
+                        const d = parseDateValue(row['epi_date']);
+                        if (!d || fiscalYearOf(d) !== fy) return false;
+                        return q === 'all' || fiscalQuarterOf(d) === Number(q);
+                    });
+                }
                 filtered = filtered.filter(row => {
                     const age = cleanNumericValue(row[ageCol]);
                     if (appState.activeAgeFilter === 'all') {
@@ -1595,11 +1666,17 @@ function renderKPIs() {
 
             // 3. KPI Coverage Rate Percentage Card
             document.getElementById('kpi-avg-title').textContent = "ร้อยละเด็กได้รับธาตุเหล็ก";
-            document.getElementById('kpi-total-avg').textContent = coverageRate.toFixed(1) + "%";
+            document.getElementById('kpi-total-avg').textContent = totalTarget > 0 ? coverageRate.toFixed(1) + "%" : "–";
 
             // MOPH Target Threshold = 75.0%
             const targetBadge = document.getElementById('moph-target-badge');
-            if (coverageRate >= 75.0) {
+            if (totalTarget === 0) {
+                const quarterText = appState.activeQuarter === 'all' ? '' : ` ไตรมาส ${appState.activeQuarter}`;
+                document.getElementById('kpi-avg-subtitle').className = "kpi-trend";
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="info"></i> ไม่มีข้อมูลบริการในปีงบ ${appState.fiscalYear}${quarterText}`;
+                targetBadge.className = "target-badge";
+                targetBadge.innerHTML = `เป้าหมาย 75% | ไม่มีข้อมูล`;
+            } else if (coverageRate >= 75.0) {
                 document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
                 document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (>=75%)`;
                 targetBadge.className = "target-badge met";
