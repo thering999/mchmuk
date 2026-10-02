@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.6.0 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.6.2 Loaded Successfully");
 
 // ==========================================================================
 // ☁️ GitHub Storage Configuration (Central Data Persistence)
@@ -71,6 +71,8 @@ let charts = {
 const neonColors = ['#0284c7', '#16a34a', '#dc2626', '#0d9488', '#f59e0b', '#6366f1', '#65a30d'];
 
 const isNarrowScreen = () => window.innerWidth < 640;
+// Must match .chart-body height in style.css; '100%' resolves against the whole card and overflows
+const chartHeight = () => isNarrowScreen() ? 300 : 340;
 
 function parseDateValue(val) {
     if (val === undefined || val === null || val === '') return null;
@@ -1796,7 +1798,7 @@ function renderMophModeCharts(rows) {
         }],
         chart: {
             type: 'bar',
-            height: '100%',
+            height: chartHeight(),
             background: 'transparent',
             foreColor: '#475569',
             toolbar: { show: false }
@@ -1864,7 +1866,7 @@ function renderMophModeCharts(rows) {
         series: [totalNormal, totalAnemia, totalNotTested],
         chart: {
             type: 'donut',
-            height: '100%',
+            height: chartHeight(),
             background: 'transparent',
             foreColor: '#475569'
         },
@@ -1944,7 +1946,7 @@ function renderMophModeCharts(rows) {
         }],
         chart: {
             type: 'area',
-            height: '100%',
+            height: chartHeight(),
             background: 'transparent',
             foreColor: '#475569',
             toolbar: { show: true },
@@ -2035,7 +2037,7 @@ function renderMophModeCharts(rows) {
         }],
         chart: {
             type: 'bar',
-            height: '100%',
+            height: chartHeight(),
             background: 'transparent',
             foreColor: '#475569',
             toolbar: { show: false }
@@ -2056,7 +2058,7 @@ function renderMophModeCharts(rows) {
             style: { fontSize: '11px', colors: ["#dc2626"] }
         },
         xaxis: {
-            categories: ['กลุ่มที่ได้รับธาตุเหล็ก', 'กลุ่มที่ไม่ได้รับธาตุเหล็ก'],
+            categories: isNarrowScreen() ? ['ได้รับยา', 'ไม่ได้รับยา'] : ['กลุ่มที่ได้รับธาตุเหล็ก', 'กลุ่มที่ไม่ได้รับธาตุเหล็ก'],
             labels: { style: { fontSize: '11px', fontWeight: 'bold' }, trim: false, rotate: 0 }
         },
         grid: { borderColor: 'rgba(15,23,42,0.08)', padding: { bottom: 16 } },
@@ -2142,7 +2144,7 @@ function renderAnemia12mCharts(rows) {
             { name: '🟢 ปกติ (Normal)', data: normalCounts },
             { name: '🔴 ซีด / โลหิตจาง', data: anemiaCounts }
         ],
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: true }, stacked: true },
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#475569', toolbar: { show: true }, stacked: true },
         theme: { mode: 'light' },
         colors: ['#16a34a', '#dc2626'],
         plotOptions: { bar: { horizontal: true, borderRadius: 3, barHeight: '65%' } },
@@ -2182,7 +2184,7 @@ function renderAnemia12mCharts(rows) {
 
     const donutOptions = {
         series: [totalNormal, totalAnemia, totalUntested],
-        chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#475569' },
+        chart: { type: 'donut', height: chartHeight(), background: 'transparent', foreColor: '#475569' },
         theme: { mode: 'light' },
         colors: ['#16a34a', '#dc2626', '#f59e0b'],
         labels: ['ปกติ (HCT≥33 / Hb≥11)', 'ซีด (HCT<33 / Hb<11)', 'ยังไม่ได้ตรวจ Lab'],
@@ -2211,7 +2213,7 @@ function renderAnemia12mCharts(rows) {
             { name: '🟢 ปกติ', data: hospAllSorted.map(h => hospMap[h].tested - hospMap[h].anemia) },
             { name: '🔴 ซีด / โลหิตจาง', data: hospAllSorted.map(h => hospMap[h].anemia) }
         ],
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: true }, stacked: true },
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#475569', toolbar: { show: true }, stacked: true },
         theme: { mode: 'light' },
         colors: ['#16a34a', '#dc2626'],
         plotOptions: { bar: { horizontal: false, columnWidth: '65%', borderRadius: 3 } },
@@ -2253,7 +2255,7 @@ function renderAnemia12mCharts(rows) {
             { name: '🟢 ปกติ', data: amps.map(a => ampMap[a].tested - ampMap[a].anemia) },
             { name: '🔴 ซีด / โลหิตจาง', data: amps.map(a => ampMap[a].anemia) }
         ],
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false }, stacked: true },
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#475569', toolbar: { show: false }, stacked: true },
         theme: { mode: 'light' },
         colors: ['#16a34a', '#dc2626'],
         plotOptions: { bar: { columnWidth: '55%', borderRadius: 4 } },
@@ -2335,7 +2337,7 @@ function renderGenericCharts(rows) {
         series: chartSeries,
         chart: {
             type: 'area',
-            height: '100%',
+            height: chartHeight(),
             background: 'transparent',
             foreColor: '#475569',
             toolbar: { show: true },
@@ -2361,7 +2363,7 @@ function renderGenericCharts(rows) {
     // bar
     const barOptions = {
         series: chartSeries,
-        chart: { type: 'bar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
         theme: { mode: 'light' },
         colors: neonColors,
         plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 4 } },
@@ -2391,7 +2393,7 @@ function renderGenericCharts(rows) {
     }
     const donutOptions = {
         series: donutSeries,
-        chart: { type: 'donut', height: '100%', background: 'transparent', foreColor: '#475569' },
+        chart: { type: 'donut', height: chartHeight(), background: 'transparent', foreColor: '#475569' },
         theme: { mode: 'light' },
         colors: neonColors,
         labels: donutLabels,
@@ -2447,7 +2449,7 @@ function renderGenericCharts(rows) {
     }
     const radarOptions = {
         series: radarSeries,
-        chart: { type: 'radar', height: '100%', background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
+        chart: { type: 'radar', height: chartHeight(), background: 'transparent', foreColor: '#475569', toolbar: { show: false } },
         theme: { mode: 'light' },
         colors: neonColors,
         labels: radarCategories,
