@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.5.1 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.5.2 Loaded Successfully");
 
 // ==========================================================================
 // ☁️ GitHub Storage Configuration (Central Data Persistence)
@@ -1533,12 +1533,16 @@ function renderKPIs() {
 
             // 3. KPI: A/B×100 = ร้อยละโลหิตจาง (ตัวชี้วัดหลัก)
             document.getElementById('kpi-avg-title').textContent = "ร้อยละโลหิตจาง [A/B×100]";
-            document.getElementById('kpi-total-avg').textContent = anemiaRate.toFixed(1) + "%";
+            document.getElementById('kpi-total-avg').textContent = totalTested > 0 ? anemiaRate.toFixed(1) + "%" : "–";
 
-            // เป้าหมาย: 2569=≤17%, 2570=≤16%, 2571+=≤15%
             const anemiaTarget = getAnemiaTarget(appState.fiscalYear);
             const targetBadge = document.getElementById('moph-target-badge');
-            if (anemiaRate <= anemiaTarget && totalTested > 0) {
+            if (totalTested === 0) {
+                document.getElementById('kpi-avg-subtitle').className = "kpi-trend";
+                document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="info"></i> ไม่มีข้อมูลการตรวจในปีงบ ${appState.fiscalYear}`;
+                targetBadge.className = "target-badge";
+                targetBadge.innerHTML = `เป้าหมาย ≤${anemiaTarget}% | ไม่มีข้อมูล`;
+            } else if (anemiaRate <= anemiaTarget) {
                 document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
                 document.getElementById('kpi-avg-subtitle').innerHTML = `<i data-lucide="trophy"></i> ผ่านเกณฑ์กระทรวง (≤${anemiaTarget}%)`;
                 targetBadge.className = "target-badge met";
