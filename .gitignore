@@ -1,0 +1,33 @@
+# OS & Editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Data files - allow ONLY the central dataset file to be committed
+*.xlsx
+*.xls
+*.csv
+# tmp_exchange_data.xlsx is the shared dataset fetched by ALL users (must come AFTER *.xlsx)
+!tmp_exchange_data.xlsx
+
+# Log files
+*.log
+npm-debug.log*
+
+# Node (if ever used)
+node_modules/
+
+# Secret / Token files - NEVER commit these!
+token.md
+*.token
+.env
+.env.local
+secrets.txt
+
+# Local secrets and tool artifacts
+token
+.playwright-mcp/
+.claude/

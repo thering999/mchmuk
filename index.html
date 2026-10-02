@@ -6,7 +6,8 @@
     <title>MCHMUK - Holographic Excel Analytics Dashboard</title>
     
     <!-- Custom Vanilla CSS Design System -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E">
+    <link rel="stylesheet" href="style.css?v=1.5.0">
     
     <style>
         /* --- Specialized Custom Styles for HDC MOPH Mode --- */
@@ -155,9 +156,14 @@
             line-height: 1.5;
         }
         .pdpa-unlock-btn {
-            background: linear-gradient(135deg, var(--neon-pink) 0%, var(--neon-purple) 100%) !important;
-            border-color: var(--neon-pink) !important;
+            background: #dc2626 !important;
+            border-color: #dc2626 !important;
+            color: #ffffff !important;
             box-shadow: 0 0 15px rgba(220, 38, 38, 0.4) !important;
+        }
+        .pdpa-unlock-btn:hover {
+            background: #b91c1c !important;
+            color: #ffffff !important;
         }
     </style>
 </head>
@@ -235,7 +241,7 @@
                 </div>
                 <div class="logo-text">
                     <h1>MCHMUK Analytics</h1>
-                    <span>Holographic Dashboard System v1.2</span>
+                    <span>Holographic Dashboard System v1.5.0</span>
                 </div>
             </div>
             <div class="header-actions" style="display: flex; align-items: center; gap: 12px;">
@@ -472,8 +478,9 @@
                     <select id="fiscal-year-select" style="padding:4px 8px;border-radius:6px;border:1px solid rgba(245,158,11,0.3);background:var(--surface);color:var(--text-primary);font-size:0.82rem;">
                         <option value="2567">2567</option>
                         <option value="2568">2568</option>
-                        <option value="2569" selected>2569</option>
-                        <option value="2570">2570</option>
+                        <option value="2569">2569</option>
+                        <option value="2570" selected>2570</option>
+                        <option value="2571">2571</option>
                     </select>
                 </label>
                 <label style="display:flex;align-items:center;gap:6px;">
@@ -678,7 +685,7 @@
         </div>
 
         <footer>
-            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.4.0 (อัปเดต: 2 มิ.ย. 2569) | ☁️ Central GitHub Data Persistence | Built with Premium Custom CSS and Javascript.
+            Holographic Analytics Dashboard &copy; 2026 MCHMUK Dev Space | System v1.5.0 (อัปเดต: 2 ต.ค. 2569) | ☁️ Central GitHub Data Persistence | Built with Premium Custom CSS and Javascript.
         </footer>
 
     </div>
@@ -698,6 +705,6 @@
     <script src="auth.js?v=1.4.0"></script>
     
     <!-- Main Application Javascript Logic -->
-    <script src="app.js?v=1.4.0"></script>
+    <script src="app.js?v=1.5.0"></script>
 </body>
 </html>

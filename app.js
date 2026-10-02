@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.4.0 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.5.0 Loaded Successfully");
 
 // ==========================================================================
 // ☁️ GitHub Storage Configuration (Central Data Persistence)
@@ -49,7 +49,7 @@ let appState = {
     // Specialized MOPH Mode State
     isMophMode: false,
     activeMophIndicator: "iron-supplement", // "iron-supplement" | "anemia-12m"
-    fiscalYear: 2569,       // Thai fiscal year (ปีงบประมาณ)
+    fiscalYear: 2570,       // Thai fiscal year (ปีงบประมาณ)
     exportDate: null,       // Date object — วันที่ดาวน์โหลดข้อมูล (null = today)
     activeAgeFilter: "all", // all, 6-12, 36-60
     activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
@@ -68,6 +68,8 @@ let charts = {
 
 // --- Health/Government Theme Color Palette ---
 const neonColors = ['#0284c7', '#16a34a', '#dc2626', '#0d9488', '#f59e0b', '#6366f1', '#65a30d'];
+
+const isNarrowScreen = () => window.innerWidth < 640;
 
 // --- Helper to verify if a hospital code/name belongs to a public MOPH service unit in Mukdahan (excluding clinics/private hospitals) ---
 function isPublicMophHospital(code, name) {
@@ -425,7 +427,7 @@ function initMophIndicatorTabs() {
                 updateCohortHint();
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
-                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (Coverage) — เป้าหมาย ≤17% (ปี 2569), ≤16% (ปี 2570)';
+                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (Coverage) — เป้าหมาย ≤17% (ปี 2569), ≤16% (ปี 2570), ≤15% (ปี 2571)';
             }
 
             applyAllFilters();
@@ -1524,8 +1526,9 @@ function renderKPIs() {
             document.getElementById('kpi-avg-title').textContent = "ร้อยละโลหิตจาง [A/B×100]";
             document.getElementById('kpi-total-avg').textContent = anemiaRate.toFixed(1) + "%";
 
-            // เป้าหมาย ปี 2569=≤17%, ปี 2570=≤16% (ใช้ ≤17% เป็น default ปีปัจจุบัน)
-            const anemiaTarget = 17.0;
+            // เป้าหมาย: 2569=≤17%, 2570=≤16%, 2571+=≤15%
+            const anemiaTargetMap = { 2569: 17.0, 2570: 16.0, 2571: 15.0 };
+            const anemiaTarget = anemiaTargetMap[appState.fiscalYear] ?? 16.0;
             const targetBadge = document.getElementById('moph-target-badge');
             if (anemiaRate <= anemiaTarget && totalTested > 0) {
                 document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
@@ -1715,10 +1718,11 @@ function renderMophModeCharts(rows) {
             bar: {
                 horizontal: true,
                 borderRadius: 4,
-                barHeight: '75%',
-                dataLabels: { position: 'top' }
+                barHeight: '75%'
             }
         },
+        dataLabels: { enabled: false },
+        yaxis: { labels: { maxWidth: isNarrowScreen() ? 110 : 220, style: { fontSize: isNarrowScreen() ? '9px' : '11px' } } },
         xaxis: {
             categories: hospitals.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.')),
             min: 0,
@@ -1876,8 +1880,12 @@ function renderMophModeCharts(rows) {
             }
         },
         stroke: { curve: 'smooth', width: 2.5 },
+        dataLabels: { enabled: false },
+        markers: { size: 3, strokeWidth: 0, hover: { size: 6 } },
         xaxis: {
             categories: ageCategories,
+            tickAmount: isNarrowScreen() ? 6 : 12,
+            labels: { rotate: 0, hideOverlappingLabels: true },
             title: { text: 'อายุเด็กในมิติรายเดือน (months)' }
         },
         yaxis: {
@@ -1960,12 +1968,12 @@ function renderMophModeCharts(rows) {
         },
         xaxis: {
             categories: ['กลุ่มที่ได้รับธาตุเหล็ก', 'กลุ่มที่ไม่ได้รับธาตุเหล็ก'],
-            labels: { style: { fontSize: '11px', fontWeight: 'bold' } }
+            labels: { style: { fontSize: '11px', fontWeight: 'bold' }, trim: false, rotate: 0 }
         },
+        grid: { borderColor: 'rgba(15,23,42,0.08)', padding: { bottom: 16 } },
         yaxis: {
             labels: { formatter: function (val) { return val + "%"; } }
         },
-        grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
             theme: 'light',
             y: {
@@ -2049,6 +2057,7 @@ function renderAnemia12mCharts(rows) {
         theme: { mode: 'light' },
         colors: ['#16a34a', '#dc2626'],
         plotOptions: { bar: { horizontal: true, borderRadius: 3, barHeight: '65%' } },
+        yaxis: { labels: { maxWidth: isNarrowScreen() ? 110 : 220, style: { fontSize: isNarrowScreen() ? '9px' : '11px' } } },
         xaxis: {
             categories: hospLabels,
             labels: { formatter: val => val.toLocaleString() + ' ราย' }
@@ -2119,6 +2128,7 @@ function renderAnemia12mCharts(rows) {
         plotOptions: { bar: { horizontal: false, columnWidth: '65%', borderRadius: 3 } },
         xaxis: {
             categories: hospAllSorted.map(h => h.replace('โรงพยาบาลส่งเสริมสุขภาพตำบล', 'รพ.สต.').replace('โรงพยาบาล', 'รพ.')),
+            tickAmount: hospAllSorted.length,
             labels: { rotate: -45, style: { fontSize: '9px' } }
         },
         yaxis: { title: { text: 'จำนวน (ราย)' } },
@@ -2246,7 +2256,9 @@ function renderGenericCharts(rows) {
         colors: neonColors,
         fill: { type: 'gradient', gradient: { shadeIntensity: 1, opacityFrom: 0.45, opacityTo: 0.05, stops: [0, 90, 100] } },
         stroke: { curve: 'smooth', width: 3 },
-        xaxis: { categories: chartCategories, labels: { rotate: -45, style: { fontSize: '10px' } } },
+        dataLabels: { enabled: false },
+        markers: { size: 3, strokeWidth: 0, hover: { size: 6 } },
+        xaxis: { categories: chartCategories, tickAmount: Math.min(chartCategories.length, 20), labels: { rotate: -45, hideOverlappingLabels: true, style: { fontSize: '10px' } } },
         yaxis: { labels: { formatter: function (value) { return formatCompactNumber(value); } } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
         tooltip: {
@@ -2265,6 +2277,7 @@ function renderGenericCharts(rows) {
         colors: neonColors,
         plotOptions: { bar: { horizontal: false, columnWidth: '55%', borderRadius: 4 } },
         stroke: { show: true, width: 2, colors: ['transparent'] },
+        dataLabels: { enabled: false },
         xaxis: { categories: chartCategories, labels: { rotate: -45, style: { fontSize: '10px' } } },
         yaxis: { labels: { formatter: function (value) { return formatCompactNumber(value); } } },
         grid: { borderColor: 'rgba(15,23,42,0.08)' },
@@ -3047,6 +3060,3 @@ function refreshBatchList() {}
 function loadLatestActiveBatch() {}
 async function saveActiveDataset() { return { ok: true }; }
 async function getActiveDataset() { return null; }
-// Sat, Aug 15, 2026 10:12:42 AM
-// Sat, Aug 15, 2026 10:17:48 AM
-// Sat, Aug 15, 2026 10:22:52 AM

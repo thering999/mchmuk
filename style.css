@@ -1187,3 +1187,54 @@ footer a:hover {
     display: none !important;
 }
 
+/* File info fills the row when the admin dropzone is hidden */
+.upload-container:has(> #dropzone[style*="none"]) {
+    grid-template-columns: 1fr;
+}
+.upload-container:has(> #dropzone[style*="none"]) .file-info-card {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    column-gap: 40px;
+}
+
+@media (max-width: 640px) {
+    header {
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 16px;
+    }
+    .logo-text h1 {
+        font-size: 1.15rem;
+        letter-spacing: 1px;
+    }
+    .logo-text span {
+        letter-spacing: 1px;
+        font-size: 0.65rem;
+    }
+    .moph-alert-banner {
+        flex-wrap: wrap;
+    }
+    .target-badge {
+        margin-left: 50px;
+    }
+    .filter-tabs {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 4px;
+        scrollbar-width: thin;
+    }
+    .filter-tab-btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+        padding: 6px 12px;
+        font-size: 0.78rem;
+    }
+    .chart-card {
+        padding: 16px 12px;
+    }
+    .chart-body {
+        height: 300px;
+    }
+}
+
