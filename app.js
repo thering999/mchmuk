@@ -5,7 +5,7 @@
  * Specialized for MOPH Standard Report: Children Iron Supplement Syrup Coverage
  * ==========================================================================
  */
-console.log("💎 MCHMUK Core Engine v1.5.0 Loaded Successfully");
+console.log("💎 MCHMUK Core Engine v1.5.1 Loaded Successfully");
 
 // ==========================================================================
 // ☁️ GitHub Storage Configuration (Central Data Persistence)
@@ -70,6 +70,13 @@ let charts = {
 const neonColors = ['#0284c7', '#16a34a', '#dc2626', '#0d9488', '#f59e0b', '#6366f1', '#65a30d'];
 
 const isNarrowScreen = () => window.innerWidth < 640;
+
+const ANEMIA_TARGET_BY_FY = { 2569: 17.0, 2570: 16.0, 2571: 15.0 };
+const getAnemiaTarget = (fy) => ANEMIA_TARGET_BY_FY[fy] ?? 16.0;
+function syncAnemiaTabTarget() {
+    const el = document.getElementById('anemia-tab-target');
+    if (el) el.textContent = getAnemiaTarget(appState.fiscalYear);
+}
 
 // --- Helper to verify if a hospital code/name belongs to a public MOPH service unit in Mukdahan (excluding clinics/private hospitals) ---
 function isPublicMophHospital(code, name) {
@@ -472,8 +479,10 @@ function initCohortControls() {
     const fySelect = document.getElementById('fiscal-year-select');
     if (fySelect) {
         fySelect.value = String(appState.fiscalYear); // sync UI to state
+        syncAnemiaTabTarget();
         fySelect.addEventListener('change', (e) => {
             appState.fiscalYear = parseInt(e.target.value);
+            syncAnemiaTabTarget();
             updateCohortHint();
             applyAllFilters();
             triggerAnalyticsUpdate();
@@ -1527,8 +1536,7 @@ function renderKPIs() {
             document.getElementById('kpi-total-avg').textContent = anemiaRate.toFixed(1) + "%";
 
             // เป้าหมาย: 2569=≤17%, 2570=≤16%, 2571+=≤15%
-            const anemiaTargetMap = { 2569: 17.0, 2570: 16.0, 2571: 15.0 };
-            const anemiaTarget = anemiaTargetMap[appState.fiscalYear] ?? 16.0;
+            const anemiaTarget = getAnemiaTarget(appState.fiscalYear);
             const targetBadge = document.getElementById('moph-target-badge');
             if (anemiaRate <= anemiaTarget && totalTested > 0) {
                 document.getElementById('kpi-avg-subtitle').className = "kpi-trend positive";
