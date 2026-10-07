@@ -1014,6 +1014,27 @@ function loadSheetData(sheetName) {
         document.getElementById('moph-mode-notice').innerHTML = `📌 นำเข้าและประมวลผลโดยผู้ใช้สำเร็จ ณ วันที่ <strong>${formattedTime}</strong> <span style="color: var(--neon-cyan);">(พร้อมใช้งานโดยไม่ต้องผ่าน IT!)</span>`;
     }
 
+    // ✅ แสดง fiscal year badge ใน file-info card
+    const fyRow = document.getElementById('row-fy-detected');
+    const fyVal = document.getElementById('val-fy-detected');
+    if (fyRow && fyVal && appState.headers.includes('epi_date')) {
+        const fyList = getServiceFiscalYears();
+        if (fyList.length > 0) {
+            fyRow.style.display = 'flex';
+            fyVal.innerHTML = fyList.map(({ fy, count }) => {
+                const isCurrent = fy === appState.fiscalYear;
+                const style = isCurrent
+                    ? `background:var(--neon-cyan);color:#fff;box-shadow:0 0 10px var(--neon-cyan-glow);`
+                    : `background:rgba(2,132,199,0.1);color:var(--neon-cyan);`;
+                return `<span style="${style}padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;letter-spacing:0.5px;margin-left:4px;">
+                    ปีงบ ${fy} <span style="opacity:0.85;">(${count.toLocaleString()} ราย)</span>${isCurrent ? ' ✓' : ''}
+                </span>`;
+            }).join('');
+        } else {
+            fyRow.style.display = 'none';
+        }
+    }
+
     triggerAnalyticsUpdate();
     toggleLoader(false);
 
