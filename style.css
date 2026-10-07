@@ -9,17 +9,19 @@
 /* --- Design Tokens / Custom Variables --- */
 :root {
     /* Color Palette */
-    --bg-darker: #ddf0f7;
-    --bg-dark: #e8f8f2;
-    --bg-card: rgba(255, 255, 255, 0.75);
+    --bg-darker: #eef2ff;
+    --bg-dark: #ecfdf5;
+    --bg-card: rgba(255, 255, 255, 0.78);
     --bg-card-hover: rgba(255, 255, 255, 0.97);
     --ink: #0f172a;
 
-    /* Health/Government Accents: vivid Blue, vivid Green, Red */
-    --neon-cyan: #0369a1;
-    --neon-cyan-glow: rgba(3, 105, 161, 0.35);
-    --neon-purple: #059669;
-    --neon-purple-glow: rgba(5, 150, 105, 0.35);
+    /* Indigo → Cyan → Emerald Scheme */
+    --neon-cyan: #4338ca;
+    --neon-cyan-glow: rgba(67, 56, 202, 0.38);
+    --neon-purple: #0284c7;
+    --neon-purple-glow: rgba(2, 132, 199, 0.38);
+    --neon-emerald: #059669;
+    --neon-emerald-glow: rgba(5, 150, 105, 0.38);
     --neon-pink: #dc2626;
     --neon-pink-glow: rgba(220, 38, 38, 0.35);
 
@@ -27,11 +29,11 @@
     --text-primary: #0f172a;
     --text-secondary: #334155;
     --text-muted: #64748b;
-    --text-cyan: #0284c7;
+    --text-cyan: #4f46e5;
 
     /* UI Scale & Borders */
-    --border-glow: rgba(3, 105, 161, 0.3);
-    --border-glow-purple: rgba(5, 150, 105, 0.3);
+    --border-glow: rgba(67, 56, 202, 0.3);
+    --border-glow-purple: rgba(2, 132, 199, 0.3);
     --border-light: rgba(15, 23, 42, 0.10);
     --border-radius-lg: 16px;
     --border-radius-md: 10px;
@@ -51,9 +53,9 @@
 body {
     background-color: var(--bg-darker);
     background-image:
-        radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.45) 0px, transparent 50%),
-        radial-gradient(at 100% 0%, rgba(52, 211, 153, 0.45) 0px, transparent 50%),
-        radial-gradient(at 50% 100%, rgba(99, 179, 237, 0.35) 0px, transparent 50%),
+        radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.4) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(6, 182, 212, 0.38) 0px, transparent 50%),
+        radial-gradient(at 50% 100%, rgba(16, 185, 129, 0.32) 0px, transparent 50%),
         linear-gradient(rgba(15, 23, 42, 0.025) 1px, transparent 1px),
         linear-gradient(90deg, rgba(15, 23, 42, 0.025) 1px, transparent 1px);
     background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
@@ -71,7 +73,7 @@ body::before {
     left: -10%;
     width: 55%;
     height: 55%;
-    background: radial-gradient(ellipse, rgba(56, 189, 248, 0.55) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(99, 102, 241, 0.52) 0%, transparent 70%);
     border-radius: 50%;
     pointer-events: none;
     z-index: 0;
@@ -85,7 +87,7 @@ body::after {
     right: -5%;
     width: 50%;
     height: 50%;
-    background: radial-gradient(ellipse, rgba(52, 211, 153, 0.5) 0%, transparent 70%);
+    background: radial-gradient(ellipse, rgba(16, 185, 129, 0.48) 0%, transparent 70%);
     border-radius: 50%;
     pointer-events: none;
     z-index: 0;
@@ -101,12 +103,12 @@ body::after {
     background: var(--bg-darker);
 }
 ::-webkit-scrollbar-thumb {
-    background: rgba(22, 163, 74, 0.2);
+    background: rgba(67, 56, 202, 0.2);
     border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--neon-purple);
-    box-shadow: 0 0 10px var(--neon-purple-glow);
+    background: var(--neon-cyan);
+    box-shadow: 0 0 10px var(--neon-cyan-glow);
 }
 
 /* --- Layout Containers --- */
@@ -133,7 +135,7 @@ header {
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border-glow);
     border-radius: var(--border-radius-lg);
-    box-shadow: 0 0 30px rgba(3, 105, 161, 0.14), 0 2px 8px rgba(5, 150, 105, 0.08);
+    box-shadow: 0 0 30px rgba(67, 56, 202, 0.16), 0 2px 8px rgba(6, 182, 212, 0.1);
     position: relative;
     overflow: hidden;
 }
@@ -178,7 +180,7 @@ header::before {
     font-size: 1.5rem;
     font-weight: 900;
     letter-spacing: 2px;
-    background: linear-gradient(90deg, var(--text-primary) 0%, var(--neon-cyan) 40%, var(--neon-purple) 70%, var(--neon-cyan) 100%);
+    background: linear-gradient(90deg, var(--neon-cyan) 0%, var(--neon-purple) 40%, var(--neon-emerald) 70%, var(--neon-cyan) 100%);
     background-size: 200% auto;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -262,7 +264,7 @@ header::before {
 }
 
 .btn {
-    background: linear-gradient(135deg, rgba(2, 132, 199, 0.15) 0%, rgba(22, 163, 74, 0.15) 100%);
+    background: linear-gradient(135deg, rgba(67, 56, 202, 0.12) 0%, rgba(6, 182, 212, 0.12) 100%);
     border: 1px solid var(--neon-cyan);
     color: var(--neon-cyan);
     padding: 10px 24px;
@@ -297,7 +299,7 @@ header::before {
 }
 
 .btn:hover {
-    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 100%);
+    background: linear-gradient(135deg, var(--neon-cyan) 0%, var(--neon-purple) 50%, var(--neon-emerald) 100%);
     color: var(--ink);
     box-shadow: 0 0 18px var(--neon-cyan-glow);
     transform: translateY(-2px);
@@ -502,16 +504,16 @@ header::before {
     border-radius: var(--border-radius-lg) var(--border-radius-lg) 0 0;
 }
 .kpi-card.cyan {
-    background: linear-gradient(135deg, rgba(3, 105, 161, 0.07) 0%, rgba(255,255,255,0.82) 60%);
+    background: linear-gradient(135deg, rgba(67, 56, 202, 0.08) 0%, rgba(255,255,255,0.82) 60%);
 }
 .kpi-card.purple {
-    background: linear-gradient(135deg, rgba(5, 150, 105, 0.07) 0%, rgba(255,255,255,0.82) 60%);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.07) 0%, rgba(255,255,255,0.82) 60%);
 }
 .kpi-card.pink {
     background: linear-gradient(135deg, rgba(220, 38, 38, 0.06) 0%, rgba(255,255,255,0.82) 60%);
 }
-.kpi-card.cyan::before { background: linear-gradient(90deg, var(--neon-cyan), rgba(5, 150, 105, 0.6)); }
-.kpi-card.purple::before { background: linear-gradient(90deg, var(--neon-purple), rgba(3, 105, 161, 0.5)); }
+.kpi-card.cyan::before { background: linear-gradient(90deg, var(--neon-cyan), var(--neon-purple)); }
+.kpi-card.purple::before { background: linear-gradient(90deg, var(--neon-purple), var(--neon-emerald)); }
 .kpi-card.pink::before { background: linear-gradient(90deg, var(--neon-pink), rgba(220, 38, 38, 0.3)); }
 
 .kpi-card::after {
@@ -573,12 +575,12 @@ header::before {
 }
 
 .kpi-card.cyan .kpi-icon {
-    background: rgba(2, 132, 199, 0.1);
+    background: rgba(67, 56, 202, 0.1);
     color: var(--neon-cyan);
 }
 
 .kpi-card.purple .kpi-icon {
-    background: rgba(22, 163, 74, 0.1);
+    background: rgba(2, 132, 199, 0.1);
     color: var(--neon-purple);
 }
 
