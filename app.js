@@ -151,7 +151,7 @@ function updatePeriodControls() {
     }
 }
 
-const ANEMIA_TARGET_BY_FY ={ 2569: 17.0, 2570: 16.0, 2571: 15.0 };
+const ANEMIA_TARGET_BY_FY ={ 2569: 17.0, 2570: 16.0, 2571: 15.0, 2572: 14.0 };
 const getAnemiaTarget = (fy) => ANEMIA_TARGET_BY_FY[fy] ?? 16.0;
 function syncAnemiaTabTarget() {
     const el = document.getElementById('anemia-tab-target');
@@ -511,7 +511,7 @@ function initMophIndicatorTabs() {
                 if (disclaimer) disclaimer.style.display = 'block';
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
-                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (Coverage) — เป้าหมาย ≤17% (ปี 2569), ≤16% (ปี 2570), ≤15% (ปี 2571)';
+                    'ร้อยละเด็กอายุครบ 12 เดือนในเขตรับผิดชอบ มีภาวะโลหิตจาง (Coverage) — เป้าหมาย ≤17% (ปี 2569), ≤16% (ปี 2570), ≤15% (ปี 2571), ≤14% (ปี 2572)';
             }
 
             applyAllFilters();
