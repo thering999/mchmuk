@@ -559,8 +559,10 @@ function initCohortControls() {
         syncAnemiaTabTarget();
         fySelect.addEventListener('change', (e) => {
             appState.fiscalYear = parseInt(e.target.value);
+            appState.currentPage = 1;
             syncAnemiaTabTarget();
             updatePeriodControls();
+            renderFyBadge();
             applyAllFilters();
             triggerAnalyticsUpdate();
         });
@@ -1014,7 +1016,19 @@ function loadSheetData(sheetName) {
         document.getElementById('moph-mode-notice').innerHTML = `📌 นำเข้าและประมวลผลโดยผู้ใช้สำเร็จ ณ วันที่ <strong>${formattedTime}</strong> <span style="color: var(--neon-cyan);">(พร้อมใช้งานโดยไม่ต้องผ่าน IT!)</span>`;
     }
 
-    // ✅ แสดง fiscal year badge ใน file-info card
+    renderFyBadge();
+
+    triggerAnalyticsUpdate();
+    toggleLoader(false);
+
+    // ✅ แจ้งผลสำเร็จด้วย Toast
+    const rowCount = appState.rawData.length.toLocaleString();
+    const modeLabel = appState.isMophMode ? '(โหมด MOPH HDC)' : '';
+    showToast(`✅ นำเข้าข้อมูลสำเร็จ! พบ <strong>${rowCount} แถว</strong> จากแผ่นงาน "${sheetName}" ${modeLabel}`, 'success', 5000);
+}
+
+// ✅ แสดง fiscal year badge ใน file-info card
+function renderFyBadge() {
     const fyRow = document.getElementById('row-fy-detected');
     const fyVal = document.getElementById('val-fy-detected');
     if (fyRow && fyVal && appState.headers.includes('epi_date')) {
@@ -1034,14 +1048,6 @@ function loadSheetData(sheetName) {
             fyRow.style.display = 'none';
         }
     }
-
-    triggerAnalyticsUpdate();
-    toggleLoader(false);
-
-    // ✅ แจ้งผลสำเร็จด้วย Toast
-    const rowCount = appState.rawData.length.toLocaleString();
-    const modeLabel = appState.isMophMode ? '(โหมด MOPH HDC)' : '';
-    showToast(`✅ นำเข้าข้อมูลสำเร็จ! พบ <strong>${rowCount} แถว</strong> จากแผ่นงาน "${sheetName}" ${modeLabel}`, 'success', 5000);
 }
 
 // Dynamic type checker
@@ -1560,7 +1566,7 @@ function isAnemicRow(r) {
         if (lt === '0621201') return lr < 33;                          // HCT < 33
         if (lt === '0621401' || lt === '0621402') return lr < 11;     // Hb < 11
     }
-    return isAnemicRow(r); // fallback
+    return cleanNumericValue(r['anemea']) === 1; // fallback: export flag
 }
 
 function cleanNumericValue(val) {
@@ -1757,7 +1763,13 @@ function triggerAnalyticsUpdate() {
 
 function renderCharts() {
     const rows = appState.filteredData;
-    if (rows.length === 0) return;
+    if (rows.length === 0) {
+        // Clear stale charts so the view matches the (empty) filter result
+        Object.keys(charts).forEach(k => {
+            if (charts[k]) { charts[k].destroy(); charts[k] = null; }
+        });
+        return;
+    }
 
     if (appState.isMophMode) {
         renderMophModeCharts(rows);
