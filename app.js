@@ -12,15 +12,14 @@ console.log("💎 MCHMUK Core Engine v1.6.3 Loaded Successfully");
 // Admin uploads are pushed to GitHub repo so ALL users see the same data.
 // Regular users simply fetch the file — no upload needed.
 // ==========================================================================
-// Obfuscated token to bypass GitHub secret scanners (reversed string decoded at runtime)
-const _t = 'HOyzla4w7BWSKMRICBJ1nu08zZatZ39ljMVZRcSuNILNPVRk0DOm4G4Oead_Xm4xN8QKD4ve0IU4KWCA11_tap_buhtig'.split('').reverse().join('');
+// GitHub token: ห้ามฝังในโค้ด (repo เป็น public) — Admin ใส่เองที่หน้า Admin แล้วเก็บใน localStorage ของเครื่องตัวเอง
 
 const GITHUB_CONFIG = {
     owner: 'thering999',
     repo: 'mchmuk',
     branch: 'main',
     filePath: 'tmp_exchange_data.xlsx',
-    get token() { return _t; }
+    get token() { try { return localStorage.getItem('mchmuk_gh_pat') || ''; } catch (e) { return ''; } }
 };
 const DATASET_URL = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.filePath}`;
 
@@ -361,7 +360,7 @@ function onUserLoginSuccess(user, role, data) {
     if (role === 'admin') {
         dropzone.style.display = 'flex';
         if (adminGhConfig) {
-            adminGhConfig.style.display = 'none';
+            adminGhConfig.style.display = GITHUB_CONFIG.token ? 'none' : 'block'; // ยังไม่มี token = ให้ใส่
         }
     } else {
         dropzone.style.display = 'none';
