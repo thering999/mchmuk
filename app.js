@@ -150,7 +150,7 @@ function updatePeriodControls() {
     }
 }
 
-const ANEMIA_TARGET_BY_FY ={ 2569: 17.0, 2570: 16.0, 2571: 15.0, 2572: 14.0 };
+const ANEMIA_TARGET_BY_FY = { 2568: 18.0, 2569: 17.0, 2570: 16.0, 2571: 15.0, 2572: 14.0 };
 const getAnemiaTarget = (fy) => ANEMIA_TARGET_BY_FY[fy] ?? 16.0;
 function syncAnemiaTabTarget() {
     const el = document.getElementById('anemia-tab-target');
