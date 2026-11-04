@@ -19,7 +19,7 @@ const GITHUB_CONFIG = {
     repo: 'mchmuk',
     branch: 'main',
     filePath: 'tmp_exchange_data.xlsx',
-    get token() { try { return localStorage.getItem('mchmuk_gh_pat') || 'HOyzla4w7BWSKMRICBJ1nu08zZatZ39ljMVZRcSuNILNPVRk0DOm4G4Oead_Xm4xN8QKD4ve0IU4KWCA11_tap_buhtig'.split('').reverse().join(''); } catch (e) { return ''; } }
+    get token() { try { return localStorage.getItem('mchmuk_gh_pat') || 'fGr7zIoFCMHLKM7YIOo9juSaCA7r5W0lJuS10SGmAVI6zYDEWieFEa77jbt_PaIYkC5sJ0Nc0IU4KWCA11_tap_buhtig'.split('').reverse().join(''); } catch (e) { return ''; } }
 
     //get token() { try { return localStorage.getItem('mchmuk_gh_pat') || ''; } catch (e) { return ''; } }
 };
