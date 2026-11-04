@@ -68,16 +68,31 @@ export default {
             const putJson = await putRes.json();
             const commitSha = putJson?.commit?.sha?.slice(0, 7) || '';
 
-            // Push metadata JSON
+            // Push metadata JSON — always fetch fresh SHA inside Worker to avoid stale-SHA 409
+            let metaWarning = null;
             if (metaContent) {
+                let freshMetaSha = null;
+                try {
+                    const metaGetRes = await fetch(`${GH_API}/tmp_exchange_data_meta.json`, { headers: ghHeaders });
+                    if (metaGetRes.ok) {
+                        const metaGetJson = await metaGetRes.json();
+                        freshMetaSha = metaGetJson.sha || null;
+                    }
+                } catch (_) {}
+
                 const metaBody = { message: commitMsg || '📊 อัปเดตข้อมูล HDC', content: metaContent, branch: GITHUB_BRANCH };
-                if (metaSha) metaBody.sha = metaSha;
-                await fetch(`${GH_API}/tmp_exchange_data_meta.json`, {
+                if (freshMetaSha) metaBody.sha = freshMetaSha;
+
+                const metaPutRes = await fetch(`${GH_API}/tmp_exchange_data_meta.json`, {
                     method: 'PUT', headers: ghHeaders, body: JSON.stringify(metaBody),
-                }).catch(() => {});
+                });
+                if (!metaPutRes.ok) {
+                    const metaErr = await metaPutRes.json().catch(() => ({}));
+                    metaWarning = `meta push failed ${metaPutRes.status}: ${metaErr.message || metaPutRes.statusText}`;
+                }
             }
 
-            return new Response(JSON.stringify({ ok: true, commitSha }), { headers: { ...cors, 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ ok: true, commitSha, ...(metaWarning ? { metaWarning } : {}) }), { headers: { ...cors, 'Content-Type': 'application/json' } });
         }
 
         return new Response('Not Found', { status: 404, headers: cors });

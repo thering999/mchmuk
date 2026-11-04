@@ -3024,13 +3024,15 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
         const result = await uploadRes.json();
 
         if (result.ok) {
+            const extraWarn = result.metaWarning ? `<br>⚠️ Metadata: ${result.metaWarning}` : '';
             showToast(
                 `✅ Push สำเร็จ! (commit: ${result.commitSha})<br>` +
                 `🚀 GitHub Actions กำลัง Deploy อัตโนมัติ — ` +
                 `<a href="${actionsUrl}" target="_blank" style="color:#0284c7;text-decoration:underline;">ดู Actions →</a><br>` +
-                `⏱️ ผู้ใช้ทุกคนจะเห็นข้อมูลใหม่ภายใน ~1-2 นาที`,
+                `⏱️ ผู้ใช้ทุกคนจะเห็นข้อมูลใหม่ภายใน ~1-2 นาที${extraWarn}`,
                 'success', 10000
             );
+            if (result.metaWarning) console.warn('meta push warning:', result.metaWarning);
             console.log(`☁️ push success — commit: ${result.commitSha}`);
         } else {
             if (result.status === 401 || result.status === 403) {
