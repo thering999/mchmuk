@@ -1470,6 +1470,10 @@ function applyAllFilters() {
     }
 
     // 1.5 Apply Specialized MOPH HCT Lab Filter if active (iron-supplement indicator only)
+    // Save pre-HCT-filter stats so KPI denominator/numerator stay correct regardless of active sub-filter
+    appState.preHctFilterCount = filtered.length;
+    appState.preHctTestedCount = filtered.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+    appState.preHctAnemiaCount = filtered.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
     if (appState.isMophMode && appState.activeMophIndicator === 'iron-supplement') {
         const labStatusCol = 'lab_result_status';
         const anemiaCol = 'anemea';
@@ -1571,13 +1575,15 @@ function handleTableSearch() {
 
 // คำนวณภาวะโลหิตจางจาก labresult โดยตรง (anemea column ใน export มักไม่ถูก populate)
 function isAnemicRow(r) {
-    const lt = String(r['labtest'] || '').trim();
+    const lt = String(r['labtest'] || '').trim().replace(/,/g, '').replace(/^0+/, '');
     const lr = parseFloat(r['labresult']);
     if (!isNaN(lr) && lr > 0) {
-        if (lt === '0621201') return lr < 33;                          // HCT < 33
-        if (lt === '0621401' || lt === '0621402') return lr < 11;     // Hb < 11
+        if (lt === '621201') return lr < 33;                     // HCT% < 33
+        if (lt === '621401' || lt === '621402') return lr < 11;  // Hb g/dL < 11
     }
-    return cleanNumericValue(r['anemea']) === 1; // fallback: export flag
+    // anemea: 2 = ซีด (โลหิตจาง), 0 = ปกติ — per table display logic
+    const anemea = cleanNumericValue(r['anemea']);
+    return anemea === 2 || anemea === 1;
 }
 
 function cleanNumericValue(val) {
@@ -1680,11 +1686,12 @@ function renderKPIs() {
 
             const coverageRate = totalTarget > 0 ? (totalReceived / totalTarget * 100) : 0;
 
-            // Anemia and HCT screening rates calculation
-            const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
-            const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
+            // Anemia and HCT screening rates — always use pre-HCT-filter counts so sub-filter doesn't distort rates
+            const totalTested = appState.preHctTestedCount ?? rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+            const totalAnemia = appState.preHctAnemiaCount ?? rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
 
-            const testedRate = totalTarget > 0 ? (totalTested / totalTarget * 100) : 0;
+            const hctBase = appState.preHctFilterCount > 0 ? appState.preHctFilterCount : totalTarget;
+            const testedRate = hctBase > 0 ? (totalTested / hctBase * 100) : 0;
             const anemiaPrevalence = totalTested > 0 ? (totalAnemia / totalTested * 100) : 0;
 
             // 1. KPI Target Card
