@@ -18,18 +18,10 @@ const GITHUB_CONFIG = {
     owner: 'thering999',
     repo: 'mchmuk',
     branch: 'main',
-    get filePath() { return getDataFilePath(appState?.fiscalYear || 2570); },
-    get metaPath() { return getDataMetaPath(appState?.fiscalYear || 2570); },
+    filePath: 'tmp_exchange_data.xlsx',
     get token() { try { return localStorage.getItem('mchmuk_gh_pat') || ''; } catch (e) { return ''; } }
 };
-function getDataFilePath(fy) { return `tmp_exchange_data_${fy}.xlsx`; }
-function getDataMetaPath(fy) { return `tmp_exchange_data_${fy}_meta.json`; }
-function getDatasetUrl(fy) {
-    const f = fy ? getDataFilePath(fy) : GITHUB_CONFIG.filePath;
-    return `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${f}`;
-}
-// Legacy alias for backward compat (read-only snapshot — use getDatasetUrl() for dynamic access)
-const DATASET_URL = getDatasetUrl(2570);
+const DATASET_URL = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.filePath}`;
 
 // --- Global Application State ---
 let appState = {
@@ -158,7 +150,7 @@ function updatePeriodControls() {
     }
 }
 
-const ANEMIA_TARGET_BY_FY = { 2568: 18.0, 2569: 17.0, 2570: 16.0, 2571: 15.0, 2572: 14.0 };
+const ANEMIA_TARGET_BY_FY ={ 2569: 17.0, 2570: 16.0, 2571: 15.0, 2572: 14.0 };
 const getAnemiaTarget = (fy) => ANEMIA_TARGET_BY_FY[fy] ?? 16.0;
 function syncAnemiaTabTarget() {
     const el = document.getElementById('anemia-tab-target');
@@ -564,26 +556,14 @@ function initCohortControls() {
     if (fySelect) {
         fySelect.value = String(appState.fiscalYear); // sync UI to state
         syncAnemiaTabTarget();
-        const updateUploadHint = () => {
-            const hint = document.getElementById('admin-upload-target-hint');
-            if (hint) hint.textContent = getDataFilePath(appState.fiscalYear);
-        };
-        updateUploadHint();
         fySelect.addEventListener('change', (e) => {
             appState.fiscalYear = parseInt(e.target.value);
             appState.currentPage = 1;
             syncAnemiaTabTarget();
-            updateUploadHint();
             updatePeriodControls();
             renderFyBadge();
-            // โหลดข้อมูลจากไฟล์ปีงบใหม่แล้วค่อย render
-            loadLocalExcelFile(false).then(() => {
-                applyAllFilters();
-                triggerAnalyticsUpdate();
-            }).catch(() => {
-                applyAllFilters();
-                triggerAnalyticsUpdate();
-            });
+            applyAllFilters();
+            triggerAnalyticsUpdate();
         });
     }
     const quarterSelect = document.getElementById('quarter-select');
@@ -2842,7 +2822,7 @@ function formatDateString(val) {
 async function getFileLastCommitDate() {
     try {
         const token = GITHUB_CONFIG.token;
-        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/commits?path=${getDataFilePath(appState.fiscalYear)}&page=1&per_page=1`;
+        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/commits?path=${GITHUB_CONFIG.filePath}&page=1&per_page=1`;
         const headers = {
             'Accept': 'application/vnd.github+json',
             'X-GitHub-Api-Version': '2022-11-28'
@@ -2871,11 +2851,10 @@ async function loadLocalExcelFile(isSilent = false) {
         // ดึงจาก GitHub raw URL เพื่อให้ทุกเครื่องเห็นข้อมูลเดียวกัน
         // เพิ่ม cache-bust เพื่อไม่ให้ browser cache ไฟล์เก่า
         const cacheBust = Date.now();
-        const fetchUrl = `${getDatasetUrl(appState.fiscalYear)}?cb=${cacheBust}`;
+        const fetchUrl = `${DATASET_URL}?cb=${cacheBust}`;
 
         const response = await fetch(fetchUrl);
-        if (!response.ok) throw new Error(`HTTP ${response.status}: ไม่พบไฟล์ข้อมูลปีงบ ${appState.fiscalYear} บน server (${getDataFilePath(appState.fiscalYear)})`);
-
+        if (!response.ok) throw new Error(`HTTP ${response.status}: ไม่พบไฟล์ข้อมูลบน server`);
 
         const buffer = await response.arrayBuffer();
         const data = new Uint8Array(buffer);
@@ -2889,14 +2868,14 @@ async function loadLocalExcelFile(isSilent = false) {
         appState.workbook = workbook;
         appState.sheetNames = workbook.SheetNames;
 
-        document.getElementById('val-filename').textContent = getDataFilePath(appState.fiscalYear);
+        document.getElementById('val-filename').textContent = GITHUB_CONFIG.filePath;
         document.getElementById('val-filesize').textContent = formatBytes(buffer.byteLength);
         document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
 
         // ดึงวันเวลานำเข้าข้อมูลจริงจาก Metadata JSON หรือ Commit ล่าสุดของ GitHub
         let commitDateStr = null;
         try {
-            const metaUrl = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${getDataMetaPath(appState.fiscalYear)}?cb=${cacheBust}`;
+            const metaUrl = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/tmp_exchange_data_meta.json?cb=${cacheBust}`;
             const metaResponse = await fetch(metaUrl);
             if (metaResponse.ok) {
                 const metaJson = await metaResponse.json();
@@ -2968,7 +2947,7 @@ async function loadLocalExcelFile(isSilent = false) {
         toggleLoader(false);
 
         if (!isSilent) {
-            showToast(`☁️ โหลดข้อมูลปีงบ ${appState.fiscalYear} สำเร็จ!`, 'success', 4000);
+            showToast('☁️ ดึงข้อมูลจากเซิร์ฟเวอร์กลางสำเร็จ! ข้อมูลเป็นปัจจุบัน', 'success', 4000);
         }
 
     } catch (err) {
@@ -3004,7 +2983,7 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
     try {
         // Step 1: ดึง SHA ของไฟล์เดิม
         showToast('☁️ [1/3] กำลังเชื่อมต่อ GitHub...', 'info', 3000);
-        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${getDataFilePath(appState.fiscalYear)}`;
+        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`;
         const headers = {
             'Authorization': `Bearer ${token}`,
             'Accept': 'application/vnd.github+json',
@@ -3025,7 +3004,7 @@ async function pushExcelToGitHub(arrayBuffer, originalFilename) {
 
         // Step 3: Push ไฟล์ใหม่
         const now = new Date();
-        const commitMsg = `📊 อัปเดตข้อมูล HDC ปีงบ ${appState.fiscalYear} โดย Admin เมื่อ ${now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น. (${originalFilename})`;
+        const commitMsg = `📊 อัปเดตข้อมูล HDC โดย Admin เมื่อ ${now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น. (${originalFilename})`;
         const body = { message: commitMsg, content: base64, branch: GITHUB_CONFIG.branch };
         if (existingSha) body.sha = existingSha;
 
@@ -3090,7 +3069,7 @@ async function pushMetadataToGitHub(originalFilename, fileSize) {
     const token = GITHUB_CONFIG.token;
     if (!token) return;
 
-    const metaPath = getDataMetaPath(appState.fiscalYear);
+    const metaPath = 'tmp_exchange_data_meta.json';
     const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${metaPath}`;
     const headers = {
         'Authorization': `Bearer ${token}`,
