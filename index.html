@@ -643,6 +643,34 @@
                 </div>
             </section>
 
+            <!-- Trend Analysis Section (MOPH mode only) -->
+            <section id="trend-section" style="display:none; flex-direction:column; gap:16px;">
+                <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:4px 0;">
+                    <span style="font-weight:600; font-size:0.85rem; color:var(--text-secondary); display:flex; align-items:center; gap:5px;">
+                        <i data-lucide="trending-up" style="width:15px;height:15px;"></i> วิเคราะห์แนวโน้ม:
+                    </span>
+                    <button class="filter-tab-btn active" id="trend-tab-monthly" data-trend="monthly">รายเดือน</button>
+                    <button class="filter-tab-btn" id="trend-tab-quarterly" data-trend="quarterly">รายไตรมาส</button>
+                    <button class="filter-tab-btn" id="trend-tab-district" data-trend="district">รายอำเภอ</button>
+                    <button class="filter-tab-btn" id="trend-tab-unit" data-trend="unit">รายหน่วยบริการ</button>
+                    <button class="filter-tab-btn" id="trend-tab-fiscal" data-trend="fiscal">เปรียบเทียบปีงบ</button>
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-card col-8">
+                        <div class="chart-header">
+                            <span class="chart-title" id="trend-chart-main-title"><i data-lucide="line-chart"></i> แนวโน้มรายเดือน</span>
+                        </div>
+                        <div class="chart-body" id="trend-chart-main"></div>
+                    </div>
+                    <div class="chart-card col-4">
+                        <div class="chart-header">
+                            <span class="chart-title" id="trend-chart-side-title"><i data-lucide="bar-chart-2"></i> สรุปรายไตรมาส</span>
+                        </div>
+                        <div class="chart-body" id="trend-chart-side"></div>
+                    </div>
+                </div>
+            </section>
+
             <!-- Interactive Cyber-Grid Table -->
             <section class="table-card" style="position: relative;">
                 <!-- PDPA Lock Screen Overlay -->

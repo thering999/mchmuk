@@ -55,6 +55,7 @@ let appState = {
     activeHctFilter: "all",  // all, not-tested, tested, anemia, normal
     activeHospitalFilter: "all",
     activeDistrictFilter: "all",
+    activeTrendTab: "monthly",
     importTimestamp: null
 };
 
@@ -63,7 +64,9 @@ let charts = {
     area: null,
     bar: null,
     donut: null,
-    radar: null
+    radar: null,
+    trendMain: null,
+    trendSide: null
 };
 
 // --- Health/Government Theme Color Palette ---
@@ -224,6 +227,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
     // Bind Indicator Group Tabs for MOPH Mode
     initMophIndicatorTabs();
+    initTrendTabs();
 
     // Bind Age Tabs for MOPH Mode
     initMophAgeFilters();
@@ -2125,6 +2129,8 @@ function renderMophModeCharts(rows) {
         charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions);
         charts.radar.render();
     }
+
+    renderTrendSection(rows);
 }
 
 // --- MOPH Indicator: ร้อยละเด็กอายุครบ 12 เดือน มีภาวะโลหิตจาง ---
@@ -2317,6 +2323,8 @@ function renderAnemia12mCharts(rows) {
     };
     if (charts.radar) { charts.radar.updateOptions(radarOptions); }
     else { charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions); charts.radar.render(); }
+
+    renderTrendSection(rows);
 }
 
 // --- Generic Multi-dimensional Chart Rendering ---
@@ -2501,6 +2509,413 @@ function renderGenericCharts(rows) {
     };
     if (charts.radar) charts.radar.updateOptions(radarOptions);
     else { charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions); charts.radar.render(); }
+
+    // Hide trend section in generic mode
+    const trendSec = document.getElementById('trend-section');
+    if (trendSec) trendSec.style.display = 'none';
+}
+
+// ==========================================================================
+// 📈 Trend Analysis Section
+// ==========================================================================
+
+function initTrendTabs() {
+    const tabs = document.querySelectorAll('#trend-section .filter-tab-btn[data-trend]');
+    tabs.forEach(tab => {
+        tab.addEventListener('click', (e) => {
+            tabs.forEach(t => t.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            appState.activeTrendTab = e.currentTarget.dataset.trend;
+            renderTrendSection(appState.filteredData);
+        });
+    });
+}
+
+function renderTrendSection(rows) {
+    const sec = document.getElementById('trend-section');
+    if (!sec) return;
+    if (!appState.isMophMode) { sec.style.display = 'none'; return; }
+    sec.style.display = 'flex';
+    lucide.createIcons();
+
+    const tab = appState.activeTrendTab || 'monthly';
+    if (tab === 'monthly') renderTrendMonthly(rows);
+    else if (tab === 'quarterly') renderTrendQuarterly(rows);
+    else if (tab === 'district') renderTrendDistrict(rows);
+    else if (tab === 'unit') renderTrendUnit(rows);
+    else if (tab === 'fiscal') renderTrendFiscal(rows);
+}
+
+const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+// FY month order: Oct(9),Nov(10),Dec(11),Jan(0)..Sep(8)
+const FY_MONTH_ORDER = [9,10,11,0,1,2,3,4,5,6,7,8];
+const FY_MONTH_LABELS = ['ต.ค.','พ.ย.','ธ.ค.','ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.'];
+const TREND_COLORS = ['#0ea5e9','#8b5cf6','#f59e0b','#10b981','#f43f5e','#64748b'];
+
+function trendChartTheme() {
+    return {
+        background: 'transparent',
+        foreColor: '#64748b',
+    };
+}
+
+function destroyTrendCharts() {
+    if (charts.trendMain) { charts.trendMain.destroy(); charts.trendMain = null; }
+    if (charts.trendSide) { charts.trendSide.destroy(); charts.trendSide = null; }
+}
+
+function renderTrendMain(el, options) {
+    if (charts.trendMain) { charts.trendMain.destroy(); charts.trendMain = null; }
+    charts.trendMain = new ApexCharts(el, options);
+    charts.trendMain.render();
+}
+
+function renderTrendSide(el, options) {
+    if (charts.trendSide) { charts.trendSide.destroy(); charts.trendSide = null; }
+    charts.trendSide = new ApexCharts(el, options);
+    charts.trendSide.render();
+}
+
+function trendGetCols() {
+    const ampnameCol = appState.headers.find(h => ['ampname','amphurname','amp_name','district'].includes(h.toLowerCase())) || null;
+    const hosnameCol = appState.headers.find(h => ['hosname','hname','hospital'].includes(h.toLowerCase())) || null;
+    return { ampnameCol, hosnameCol };
+}
+
+function renderTrendMonthly(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="line-chart"></i> แนวโน้มรายเดือน (ในปีงบที่เลือก)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="bar-chart-2"></i> สรุปรายไตรมาส';
+    lucide.createIcons();
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    // Build month buckets for FY
+    const buckets = {}; // key = monthIndex (0-11)
+    FY_MONTH_ORDER.forEach(m => { buckets[m] = { total: 0, received: 0, tested: 0, anemic: 0 }; });
+
+    rows.forEach(r => {
+        const d = parseDateValue(r['epi_date']);
+        if (!d) return;
+        const m = d.getMonth();
+        if (!buckets[m]) return;
+        buckets[m].total++;
+        if (isReceivedValue(r['result'])) buckets[m].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) {
+            buckets[m].tested++;
+            if (isAnemicRow(r)) buckets[m].anemic++;
+        }
+    });
+
+    // Filter to months with data
+    const labels = [], covSeries = [], screenSeries = [], anemiaSeries = [];
+    FY_MONTH_ORDER.forEach((m, i) => {
+        const b = buckets[m];
+        if (b.total === 0) return;
+        labels.push(FY_MONTH_LABELS[i]);
+        covSeries.push(+(b.total > 0 ? b.received / b.total * 100 : 0).toFixed(1));
+        screenSeries.push(+(b.total > 0 ? b.tested / b.total * 100 : 0).toFixed(1));
+        anemiaSeries.push(+(b.tested > 0 ? b.anemic / b.tested * 100 : 0).toFixed(1));
+    });
+
+    const series = isAnemia
+        ? [{ name: 'ร้อยละโลหิตจาง', data: anemiaSeries }]
+        : [{ name: 'ความครอบคลุม (Coverage%)', data: covSeries }, { name: 'อัตราเจาะ HCT%', data: screenSeries }];
+
+    const mainOpts = {
+        chart: { type: 'line', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series,
+        xaxis: { categories: labels, labels: { style: { fontSize: '11px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: isAnemia ? ['#f43f5e'] : [TREND_COLORS[0], TREND_COLORS[2]],
+        stroke: { curve: 'smooth', width: 2 },
+        markers: { size: 4 },
+        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '10px' } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' },
+        legend: { position: 'top' }
+    };
+    renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
+
+    // Quarterly summary side chart
+    const qBuckets = { 1: { total:0,received:0,tested:0,anemic:0 }, 2:{total:0,received:0,tested:0,anemic:0}, 3:{total:0,received:0,tested:0,anemic:0}, 4:{total:0,received:0,tested:0,anemic:0} };
+    rows.forEach(r => {
+        const d = parseDateValue(r['epi_date']);
+        if (!d) return;
+        const q = fiscalQuarterOf(d);
+        if (!qBuckets[q]) return;
+        qBuckets[q].total++;
+        if (isReceivedValue(r['result'])) qBuckets[q].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { qBuckets[q].tested++; if (isAnemicRow(r)) qBuckets[q].anemic++; }
+    });
+    const qLabels = ['Q1 (ต.ค.-ธ.ค.)','Q2 (ม.ค.-มี.ค.)','Q3 (เม.ย.-มิ.ย.)','Q4 (ก.ค.-ก.ย.)'];
+    const qVals = [1,2,3,4].map(q => {
+        const b = qBuckets[q];
+        if (isAnemia) return +(b.tested > 0 ? b.anemic/b.tested*100 : 0).toFixed(1);
+        return +(b.total > 0 ? b.received/b.total*100 : 0).toFixed(1);
+    });
+    const sideOpts = {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'Coverage%', data: qVals }],
+        xaxis: { categories: qLabels, labels: { style: { fontSize: '10px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: isAnemia ? ['#f43f5e'] : [TREND_COLORS[0]],
+        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '11px' } },
+        plotOptions: { bar: { borderRadius: 4 } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    };
+    renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+}
+
+function renderTrendQuarterly(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="bar-chart-4"></i> เปรียบเทียบรายไตรมาส (ปีงบปัจจุบัน vs ก่อนหน้า)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="pie-chart"></i> สัดส่วนเคส รายไตรมาส';
+    lucide.createIcons();
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    const qLabels = ['Q1 (ต.ค.-ธ.ค.)','Q2 (ม.ค.-มี.ค.)','Q3 (เม.ย.-มิ.ย.)','Q4 (ก.ค.-ก.ย.)'];
+
+    // Build per-FY per-Q data from rawData (all years)
+    const fyQMap = {}; // fyQMap[fy][q] = {total,received,tested,anemic}
+    (appState.rawData || []).forEach(r => {
+        const d = parseDateValue(r['epi_date']);
+        if (!d) return;
+        const fy = fiscalYearOf(d);
+        const q = fiscalQuarterOf(d);
+        if (!fyQMap[fy]) fyQMap[fy] = {};
+        if (!fyQMap[fy][q]) fyQMap[fy][q] = { total:0,received:0,tested:0,anemic:0 };
+        fyQMap[fy][q].total++;
+        if (isReceivedValue(r['result'])) fyQMap[fy][q].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { fyQMap[fy][q].tested++; if (isAnemicRow(r)) fyQMap[fy][q].anemic++; }
+    });
+
+    const sortedFYs = Object.keys(fyQMap).map(Number).sort();
+    const seriesList = sortedFYs.map(fy => ({
+        name: `ปีงบ ${fy}`,
+        data: [1,2,3,4].map(q => {
+            const b = fyQMap[fy][q] || { total:0,received:0,tested:0,anemic:0 };
+            if (isAnemia) return +(b.tested > 0 ? b.anemic/b.tested*100 : 0).toFixed(1);
+            return +(b.total > 0 ? b.received/b.total*100 : 0).toFixed(1);
+        })
+    }));
+
+    const mainOpts = {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: seriesList,
+        xaxis: { categories: qLabels },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: TREND_COLORS,
+        dataLabels: { enabled: seriesList.length <= 3, formatter: v => v + '%', style: { fontSize: '10px' } },
+        plotOptions: { bar: { borderRadius: 3, columnWidth: seriesList.length > 2 ? '70%' : '55%' } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' },
+        legend: { position: 'top' }
+    };
+    renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
+
+    // Side: donut of Q record counts (current FY filtered rows)
+    const qCounts = [1,2,3,4].map(q => rows.filter(r => { const d = parseDateValue(r['epi_date']); return d && fiscalQuarterOf(d) === q; }).length);
+    const sideOpts = {
+        chart: { type: 'donut', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: qCounts,
+        labels: qLabels,
+        colors: TREND_COLORS,
+        dataLabels: { enabled: true, formatter: (v, { seriesIndex, w }) => `${w.globals.labels[seriesIndex]}: ${w.globals.series[seriesIndex].toLocaleString()}` },
+        legend: { position: 'bottom', fontSize: '10px' },
+        tooltip: { y: { formatter: v => v.toLocaleString() + ' ราย' } }
+    };
+    renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+}
+
+function renderTrendDistrict(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="map-pin"></i> ร้อยละครอบคลุมรายอำเภอ';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="pie-chart"></i> สัดส่วนเคส รายอำเภอ';
+    lucide.createIcons();
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    const { ampnameCol } = trendGetCols();
+    if (!ampnameCol) {
+        destroyTrendCharts();
+        document.getElementById('trend-chart-main').innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่พบคอลัมน์อำเภอในข้อมูล</p>';
+        return;
+    }
+
+    const distMap = {};
+    rows.forEach(r => {
+        const dist = String(r[ampnameCol] || 'ไม่ทราบ');
+        if (!distMap[dist]) distMap[dist] = { total:0,received:0,tested:0,anemic:0 };
+        distMap[dist].total++;
+        if (isReceivedValue(r['result'])) distMap[dist].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { distMap[dist].tested++; if (isAnemicRow(r)) distMap[dist].anemic++; }
+    });
+
+    const sorted = Object.entries(distMap).sort((a,b) => {
+        const rateA = isAnemia ? (a[1].tested>0 ? a[1].anemic/a[1].tested : 0) : (a[1].total>0 ? a[1].received/a[1].total : 0);
+        const rateB = isAnemia ? (b[1].tested>0 ? b[1].anemic/b[1].tested : 0) : (b[1].total>0 ? b[1].received/b[1].total : 0);
+        return rateB - rateA;
+    });
+
+    const dLabels = sorted.map(([k]) => k);
+    const dVals = sorted.map(([,b]) => {
+        if (isAnemia) return +(b.tested > 0 ? b.anemic/b.tested*100 : 0).toFixed(1);
+        return +(b.total > 0 ? b.received/b.total*100 : 0).toFixed(1);
+    });
+
+    const mainOpts = {
+        chart: { type: 'bar', height: Math.max(300, dLabels.length * 28 + 60), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'ความครอบคลุม%', data: dVals }],
+        xaxis: { categories: dLabels, labels: { style: { fontSize: '11px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: [TREND_COLORS[0]],
+        plotOptions: { bar: { horizontal: true, borderRadius: 3, dataLabels: { position: 'top' } } },
+        dataLabels: { enabled: true, formatter: v => v + '%', offsetX: 5, style: { fontSize: '10px', colors: ['#64748b'] } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    };
+    renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
+
+    const counts = sorted.map(([,b]) => b.total);
+    const sideOpts = {
+        chart: { type: 'donut', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: counts,
+        labels: dLabels,
+        colors: neonColors,
+        legend: { position: 'bottom', fontSize: '10px' },
+        tooltip: { y: { formatter: v => v.toLocaleString() + ' ราย' } }
+    };
+    renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+}
+
+function renderTrendUnit(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="building-2"></i> ร้อยละครอบคลุมรายหน่วยบริการ (top 20)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="activity"></i> Coverage% vs เจาะ HCT% รายหน่วย';
+    lucide.createIcons();
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    const { hosnameCol } = trendGetCols();
+    if (!hosnameCol) {
+        destroyTrendCharts();
+        document.getElementById('trend-chart-main').innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่พบคอลัมน์หน่วยบริการในข้อมูล</p>';
+        return;
+    }
+
+    const hospMap = {};
+    rows.forEach(r => {
+        const h = String(r[hosnameCol] || 'ไม่ทราบ');
+        if (!hospMap[h]) hospMap[h] = { total:0,received:0,tested:0,anemic:0 };
+        hospMap[h].total++;
+        if (isReceivedValue(r['result'])) hospMap[h].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { hospMap[h].tested++; if (isAnemicRow(r)) hospMap[h].anemic++; }
+    });
+
+    const sorted = Object.entries(hospMap).sort((a,b) => {
+        const rA = isAnemia ? (a[1].tested>0?a[1].anemic/a[1].tested:0) : (a[1].total>0?a[1].received/a[1].total:0);
+        const rB = isAnemia ? (b[1].tested>0?b[1].anemic/b[1].tested:0) : (b[1].total>0?b[1].received/b[1].total:0);
+        return rB - rA;
+    }).slice(0, 20);
+
+    const hLabels = sorted.map(([k]) => k);
+    const hVals = sorted.map(([,b]) => +(isAnemia ? (b.tested>0?b.anemic/b.tested*100:0) : (b.total>0?b.received/b.total*100:0)).toFixed(1));
+
+    const mainOpts = {
+        chart: { type: 'bar', height: Math.max(320, hLabels.length * 26 + 60), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'ความครอบคลุม%', data: hVals }],
+        xaxis: { categories: hLabels, labels: { style: { fontSize: '10px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: [TREND_COLORS[1]],
+        plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
+        dataLabels: { enabled: true, formatter: v => v + '%', offsetX: 5, style: { fontSize: '10px', colors: ['#64748b'] } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    };
+    renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
+
+    // Side: grouped bar Coverage% vs HCT-tested% per unit
+    const covVals = sorted.map(([,b]) => +(b.total>0?b.received/b.total*100:0).toFixed(1));
+    const hctVals = sorted.map(([,b]) => +(b.total>0?b.tested/b.total*100:0).toFixed(1));
+    const sideOpts = {
+        chart: { type: 'bar', height: Math.max(320, hLabels.length * 26 + 60), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: 'Coverage%', data: covVals }, { name: 'เจาะ HCT%', data: hctVals }],
+        xaxis: { categories: hLabels, labels: { style: { fontSize: '10px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: [TREND_COLORS[0], TREND_COLORS[2]],
+        plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+        dataLabels: { enabled: false },
+        tooltip: { y: { formatter: v => v + '%' } },
+        legend: { position: 'top' },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    };
+    renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+}
+
+function renderTrendFiscal(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="calendar-range"></i> เปรียบเทียบรายปีงบประมาณ (แนวโน้ม Q1–Q4)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="bar-chart-3"></i> ร้อยละครอบคลุมรายปีงบ';
+    lucide.createIcons();
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    // Use all raw data across all FYs
+    const fyQMap = {};
+    (appState.rawData || []).forEach(r => {
+        const d = parseDateValue(r['epi_date']);
+        if (!d) return;
+        const fy = fiscalYearOf(d);
+        const q = fiscalQuarterOf(d);
+        if (!fyQMap[fy]) fyQMap[fy] = {};
+        if (!fyQMap[fy][q]) fyQMap[fy][q] = { total:0,received:0,tested:0,anemic:0 };
+        fyQMap[fy][q].total++;
+        if (isReceivedValue(r['result'])) fyQMap[fy][q].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { fyQMap[fy][q].tested++; if (isAnemicRow(r)) fyQMap[fy][q].anemic++; }
+    });
+
+    const sortedFYs = Object.keys(fyQMap).map(Number).sort();
+    const qLabels = ['Q1 (ต.ค.-ธ.ค.)','Q2 (ม.ค.-มี.ค.)','Q3 (เม.ย.-มิ.ย.)','Q4 (ก.ค.-ก.ย.)'];
+
+    const seriesList = sortedFYs.map(fy => ({
+        name: `ปีงบ ${fy}`,
+        data: [1,2,3,4].map(q => {
+            const b = fyQMap[fy][q] || { total:0,received:0,tested:0,anemic:0 };
+            if (isAnemia) return +(b.tested>0?b.anemic/b.tested*100:0).toFixed(1);
+            return +(b.total>0?b.received/b.total*100:0).toFixed(1);
+        })
+    }));
+
+    const mainOpts = {
+        chart: { type: 'line', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: seriesList,
+        xaxis: { categories: qLabels },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: TREND_COLORS,
+        stroke: { curve: 'smooth', width: 2 },
+        markers: { size: 5 },
+        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '10px' } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' },
+        legend: { position: 'top' }
+    };
+    renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
+
+    // Side: bar of annual overall coverage
+    const fyAnnual = sortedFYs.map(fy => {
+        let total=0,received=0,tested=0,anemic=0;
+        [1,2,3,4].forEach(q => {
+            const b = fyQMap[fy][q] || {};
+            total += b.total||0; received += b.received||0; tested += b.tested||0; anemic += b.anemic||0;
+        });
+        return { fy, rate: isAnemia ? (tested>0?+(anemic/tested*100).toFixed(1):0) : (total>0?+(received/total*100).toFixed(1):0) };
+    });
+
+    const sideOpts = {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'ร้อยละครอบคลุม', data: fyAnnual.map(x => x.rate) }],
+        xaxis: { categories: fyAnnual.map(x => `ปีงบ ${x.fy}`) },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: [TREND_COLORS[3]],
+        plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '12px' } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    };
+    renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
 }
 
 // ==========================================================================
