@@ -1351,6 +1351,14 @@ function populateDimensionSelects() {
 function applyAllFilters() {
     let filtered = [...appState.rawData];
 
+    // 0. Hard filters: typearea ∈ {1,3}, discharge = 9 (กรองอัตโนมัติถ้ามีคอลัมน์)
+    if (appState.headers.includes('typearea')) {
+        filtered = filtered.filter(r => { const v = Number(r['typearea']); return v === 1 || v === 3; });
+    }
+    if (appState.headers.includes('discharge')) {
+        filtered = filtered.filter(r => Number(r['discharge']) === 9);
+    }
+
     // 1.0 Filter out non-public MOPH units (clinics, private hospitals, SSOs, etc.) when in MOPH mode
     if (appState.isMophMode) {
         const hoscodeCol = appState.headers.find(h => {
