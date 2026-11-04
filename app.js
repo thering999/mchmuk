@@ -12,16 +12,14 @@ console.log("💎 MCHMUK Core Engine v1.6.3 Loaded Successfully");
 // Admin uploads are pushed to GitHub repo so ALL users see the same data.
 // Regular users simply fetch the file — no upload needed.
 // ==========================================================================
-// GitHub token: ห้ามฝังในโค้ด (repo เป็น public) — Admin ใส่เองที่หน้า Admin แล้วเก็บใน localStorage ของเครื่องตัวเอง
+// Upload ผ่าน Cloudflare Worker proxy — token เก็บใน Worker secret ไม่อยู่ใน repo
 
 const GITHUB_CONFIG = {
     owner: 'thering999',
     repo: 'mchmuk',
     branch: 'main',
     filePath: 'tmp_exchange_data.xlsx',
-    get token() { try { return localStorage.getItem('mchmuk_gh_pat') || 'fGr7zIoFCMHLKM7YIOo9juSaCA7r5W0lJuS10SGmAVI6zYDEWieFEa77jbt_PaIYkC5sJ0Nc0IU4KWCA11_tap_buhtig'.split('').reverse().join(''); } catch (e) { return ''; } }
-
-    //get token() { try { return localStorage.getItem('mchmuk_gh_pat') || ''; } catch (e) { return ''; } }
+    workerUrl: 'https://mchmuk-upload.habusaya.workers.dev',
 };
 const DATASET_URL = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/${GITHUB_CONFIG.filePath}`;
 
@@ -2976,87 +2974,75 @@ async function loadLocalExcelFile(isSilent = false) {
 // ==========================================================================
 
 /**
- * Push Excel file to GitHub repository via API
- * ต้องมี PAT (Personal Access Token) ที่มี scope 'repo'
- * Admin ตั้งค่าได้ที่: localStorage.setItem('mchmuk_gh_pat', 'ghp_xxxx...')
+ * Push Excel file to GitHub via Cloudflare Worker proxy
+ * Token เก็บใน Worker secret — ไม่ต้องตั้งค่าที่ browser
  */
 async function pushExcelToGitHub(arrayBuffer, originalFilename) {
-    const token = GITHUB_CONFIG.token;
-
-    if (!token) {
-        showToast('⚠️ ยังไม่ได้ตั้งค่า GitHub Token — ข้อมูลถูกวิเคราะห์บนหน้าจอแล้ว แต่ยังไม่ได้บันทึกไปยัง Server กลาง กรุณาตั้งค่า PAT ในหน้า Admin Settings', 'warn', 8000);
-        return;
-    }
-
+    const workerUrl = GITHUB_CONFIG.workerUrl;
     const actionsUrl = `https://github.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/actions`;
 
     try {
-        // Step 1: ดึง SHA ของไฟล์เดิม
-        showToast('☁️ [1/3] กำลังเชื่อมต่อ GitHub...', 'info', 3000);
-        const apiUrl = `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.filePath}`;
-        const headers = {
-            'Authorization': `Bearer ${token}`,
-            'Accept': 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-            'Content-Type': 'application/json'
-        };
-
-        let existingSha = null;
-        const getRes = await fetch(apiUrl, { headers });
-        if (getRes.ok) {
-            const getJson = await getRes.json();
-            existingSha = getJson.sha;
-        }
+        // Step 1: ดึง SHA ของไฟล์เดิมจาก Worker
+        showToast('☁️ [1/3] กำลังเชื่อมต่อ...', 'info', 3000);
+        const shaRes = await fetch(`${workerUrl}/sha?path=${GITHUB_CONFIG.filePath}`);
+        const shaJson = await shaRes.json();
+        const existingSha = shaJson.sha || null;
 
         // Step 2: แปลง ArrayBuffer → Base64
         showToast('☁️ [2/3] กำลังเตรียมข้อมูล...', 'info', 3000);
         const base64 = arrayBufferToBase64(arrayBuffer);
 
-        // Step 3: Push ไฟล์ใหม่
+        // Step 3: ดึง meta SHA
+        const metaShaRes = await fetch(`${workerUrl}/sha?path=tmp_exchange_data_meta.json`).catch(() => null);
+        const metaShaJson = metaShaRes?.ok ? await metaShaRes.json() : {};
+        const existingMetaSha = metaShaJson.sha || null;
+
+        // Step 4: สร้าง meta content
         const now = new Date();
         const commitMsg = `📊 อัปเดตข้อมูล HDC โดย Admin เมื่อ ${now.toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} น. (${originalFilename})`;
-        const body = { message: commitMsg, content: base64, branch: GITHUB_CONFIG.branch };
-        if (existingSha) body.sha = existingSha;
+        const metaObj = {
+            importTimestamp: now.toISOString(),
+            filename: originalFilename,
+            filesize: arrayBuffer.byteLength,
+        };
+        const metaContent = btoa(JSON.stringify(metaObj, null, 2));
 
+        // Step 5: Push ผ่าน Worker
         showToast('☁️ [3/3] กำลัง Push ข้อมูลขึ้น GitHub...', 'info', 4000);
-        const putRes = await fetch(apiUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+        const uploadRes = await fetch(`${workerUrl}/upload`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: base64,
+                sha: existingSha,
+                commitMsg,
+                metaContent,
+                metaSha: existingMetaSha,
+            }),
+        });
 
-        if (putRes.ok) {
-            const result = await putRes.json();
-            const commitSha = result?.commit?.sha?.slice(0, 7) || '';
-            
-            // อัปเดตไฟล์ Metadata JSON คู่กันขึ้น GitHub
-            await pushMetadataToGitHub(originalFilename, arrayBuffer.byteLength);
+        const result = await uploadRes.json();
 
+        if (result.ok) {
             showToast(
-                `✅ Push สำเร็จ! (commit: ${commitSha})<br>` +
+                `✅ Push สำเร็จ! (commit: ${result.commitSha})<br>` +
                 `🚀 GitHub Actions กำลัง Deploy อัตโนมัติ — ` +
                 `<a href="${actionsUrl}" target="_blank" style="color:#0284c7;text-decoration:underline;">ดู Actions →</a><br>` +
                 `⏱️ ผู้ใช้ทุกคนจะเห็นข้อมูลใหม่ภายใน ~1-2 นาที`,
                 'success', 10000
             );
-            console.log(`☁️ GitHub push success — commit: ${result?.commit?.sha}`);
-            console.log(`🚀 Actions deploying: ${actionsUrl}`);
+            console.log(`☁️ push success — commit: ${result.commitSha}`);
         } else {
-            const errJson = await putRes.json().catch(() => ({}));
-            const errMsg = errJson.message || putRes.statusText;
-            if (putRes.status === 401) {
-                showToast('❌ Token ไม่ถูกต้องหรือหมดอายุ — กรุณาตั้งค่า GitHub Token ใหม่', 'error', 8000);
-            } else if (putRes.status === 403) {
-                showToast(
-                    '❌ Token ไม่มีสิทธิ์เขียน — ต้องมีสิทธิ์ write เข้าคลังข้อมูล (Repository)<br>' +
-                    '<span style="font-size: 0.8rem; opacity: 0.9;">หากใช้ Fine-grained Token ต้องปรับ Repository Permissions -> <strong>Contents</strong> เป็น <strong>Read and write</strong> หรือหากใช้ Classic Token ต้องเลือก Scope: <strong>repo</strong></span>',
-                    'error',
-                    15000
-                );
+            if (result.status === 401 || result.status === 403) {
+                showToast('❌ Worker token หมดอายุ — กรุณาแจ้ง Admin อัปเดต secret', 'error', 8000);
             } else {
-                showToast(`❌ Push ไม่สำเร็จ (${putRes.status}): ${errMsg}`, 'error', 6000);
+                showToast(`❌ Push ไม่สำเร็จ (${result.status}): ${result.message}`, 'error', 6000);
             }
-            console.error('GitHub push failed:', errJson);
+            console.error('push failed:', result);
         }
     } catch (e) {
         showToast(`❌ เกิดข้อผิดพลาด: ${e.message}`, 'error', 6000);
-        console.error('GitHub push error:', e);
+        console.error('push error:', e);
     }
 }
 

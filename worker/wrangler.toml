@@ -1,0 +1,6 @@
+name = "mchmuk-upload"
+main = "src/index.js"
+compatibility_date = "2024-06-21"
+
+[observability]
+enabled = true
