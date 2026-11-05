@@ -7,7 +7,7 @@
     
     <!-- Custom Vanilla CSS Design System -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="style.css?v=1.6.5">
+    <link rel="stylesheet" href="style.css?v=1.7.0">
     <link rel="manifest" href="manifest.json">
     
     <style>
@@ -263,6 +263,9 @@
                 </button>
                 <button class="btn btn-secondary" id="btn-load-local" style="display: none;">
                     <i data-lucide="database"></i> Load Local Dev File
+                </button>
+                <button class="btn btn-secondary btn-icon" id="btn-auto-refresh" onclick="toggleAutoRefresh()" title="Auto-refresh: ปิด — คลิกเพื่อเปิด" style="padding:8px;">
+                    <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
                 </button>
                 <!-- Dark Mode Toggle -->
                 <button class="btn btn-secondary btn-icon" id="btn-dark-mode" onclick="toggleDarkMode()" title="สลับ Dark/Light Mode" style="padding:8px;">
@@ -700,6 +703,9 @@
                     <button class="filter-tab-btn" id="trend-tab-fiscal" data-trend="fiscal">เปรียบเทียบปีงบ</button>
                     <button class="filter-tab-btn" id="trend-tab-heatmap" data-trend="heatmap">Heatmap อำเภอ×เดือน</button>
                     <button class="filter-tab-btn" id="trend-tab-ranking" data-trend="ranking">จัดอันดับ รพ.</button>
+                    <button class="filter-tab-btn" id="trend-tab-multify" data-trend="multify">Overlay หลายปีงบ</button>
+                    <button class="filter-tab-btn" id="trend-tab-scatter" data-trend="scatter">Coverage vs HCT</button>
+                    <button class="filter-tab-btn" id="trend-tab-map" data-trend="map">แผนที่อำเภอ</button>
                 </div>
                 <div class="charts-grid">
                     <div class="chart-card col-8">
@@ -743,7 +749,10 @@
                     </div>
                     <div class="table-actions">
                         <button class="btn btn-secondary" id="btn-export-csv"><i data-lucide="download"></i> Export CSV</button>
+                        <button class="btn btn-secondary" id="btn-export-xlsx" onclick="exportXLSX()"><i data-lucide="file-spreadsheet"></i> Export Excel</button>
                         <button class="btn btn-secondary" id="btn-export-json"><i data-lucide="code"></i> Export JSON</button>
+                        <button class="btn btn-secondary" id="btn-share-url" onclick="shareCurrentView()" title="คัดลอกลิงก์พร้อม filter ปัจจุบัน"><i data-lucide="link"></i> แชร์ลิงก์</button>
+                        <button class="btn btn-secondary" id="btn-annotate" onclick="showAnnotationModal(appState.activeHospitalFilter)" title="หมายเหตุ / ตั้งเป้าหมายของหน่วยบริการที่เลือก"><i data-lucide="sticky-note"></i> หมายเหตุ/เป้า</button>
                         <button class="btn btn-secondary" id="btn-print-report" onclick="printReport()"><i data-lucide="printer"></i> พิมพ์/PDF</button>
                         <button class="btn btn-secondary" id="btn-data-quality" onclick="showDataQualityReport()" title="รายงานคุณภาพข้อมูล"><i data-lucide="shield-check"></i> คุณภาพข้อมูล</button>
                         <button class="btn btn-secondary" id="btn-reset-filters" onclick="resetAllFilters()" title="รีเซ็ตทุก filter (Esc)"><i data-lucide="x-circle"></i> ล้าง Filter</button>
@@ -797,7 +806,7 @@
     <script src="auth.js?v=1.4.0"></script>
     
     <!-- Main Application Javascript Logic -->
-    <script src="app.js?v=1.6.3"></script>
+    <script src="app.js?v=1.7.0"></script>
 
     <!-- Data Quality Modal -->
     <div id="dq-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:400;backdrop-filter:blur(3px);" onclick="closeDQModal()">
@@ -807,6 +816,22 @@
                 <button onclick="closeDQModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#64748b);"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
             </div>
             <div id="dq-content">กำลังวิเคราะห์...</div>
+        </div>
+    </div>
+
+    <!-- Hospital Annotation / Target Modal -->
+    <div id="annot-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:400;backdrop-filter:blur(3px);" onclick="closeAnnotationModal()">
+        <div role="dialog" aria-modal="true" aria-labelledby="annot-title" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card,white);color:var(--text-primary);border-radius:16px;padding:24px;width:min(480px,94vw);box-shadow:0 20px 60px rgba(0,0,0,0.25);" onclick="event.stopPropagation()" onkeydown="if(event.key==='Escape')closeAnnotationModal()">
+            <h3 id="annot-title" style="font-size:1rem;font-weight:700;margin-bottom:4px;">หมายเหตุ / เป้าหมาย</h3>
+            <div id="annot-hosp-name" style="font-size:0.85rem;color:var(--text-muted);margin-bottom:14px;"></div>
+            <label for="annot-target" style="font-size:0.8rem;font-weight:600;display:block;margin-bottom:4px;">เป้าหมาย Coverage (%) — เว้นว่าง = ค่ามาตรฐาน 75</label>
+            <input type="number" id="annot-target" min="1" max="100" step="0.1" class="login-input" style="margin-bottom:12px;width:100%;">
+            <label for="annot-text" style="font-size:0.8rem;font-weight:600;display:block;margin-bottom:4px;">หมายเหตุ (เก็บในเครื่องนี้เท่านั้น — ห้ามใส่ข้อมูลส่วนบุคคลผู้ป่วย)</label>
+            <textarea id="annot-text" rows="4" maxlength="1000" class="login-input" style="width:100%;resize:vertical;font-family:inherit;"></textarea>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+                <button class="btn btn-secondary" onclick="closeAnnotationModal()">ยกเลิก</button>
+                <button class="btn btn-primary" onclick="saveAnnotationModal()">บันทึก</button>
+            </div>
         </div>
     </div>
 
@@ -848,7 +873,18 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('SW registered:', reg.scope))
+                    .then(async reg => {
+                        console.log('SW registered:', reg.scope);
+                        // Periodic background sync: refresh offline dataset while app is closed (installed PWA, Chromium only)
+                        if ('periodicSync' in reg) {
+                            try {
+                                const status = await navigator.permissions.query({ name: 'periodic-background-sync' });
+                                if (status.state === 'granted') {
+                                    await reg.periodicSync.register('mchmuk-data-refresh', { minInterval: 6 * 60 * 60 * 1000 });
+                                }
+                            } catch (e) { console.warn('Periodic sync unavailable:', e.message); }
+                        }
+                    })
                     .catch(err => console.warn('SW registration failed:', err));
             });
         }

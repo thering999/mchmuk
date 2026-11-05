@@ -417,6 +417,7 @@ function onUserLoginSuccess(user, role, data) {
     
     // Enable export actions
     document.getElementById('btn-export-csv').style.display = 'inline-flex';
+    document.getElementById('btn-export-xlsx').style.display = 'inline-flex';
     document.getElementById('btn-export-json').style.display = 'inline-flex';
     
     const displayName = data?.displayName || user.email.split('@')[0];
@@ -459,6 +460,7 @@ function onUserLogoutSuccess() {
     
     // Hide export actions for guest
     document.getElementById('btn-export-csv').style.display = 'none';
+    document.getElementById('btn-export-xlsx').style.display = 'none';
     document.getElementById('btn-export-json').style.display = 'none';
     
     const dropzone = document.getElementById('dropzone');
@@ -1977,7 +1979,7 @@ function renderCoverageAlerts() {
     });
 
     const belowTarget = Object.entries(hospMap)
-        .filter(([, b]) => b.total >= 5 && (b.received / b.total * 100) < 75)
+        .filter(([name, b]) => b.total >= 5 && (b.received / b.total * 100) < getHospitalTarget(name))
         .sort((a, b) => (a[1].received / a[1].total) - (b[1].received / b[1].total));
 
     chips.innerHTML = '';
@@ -1987,7 +1989,7 @@ function renderCoverageAlerts() {
         const pct = (b.received / b.total * 100).toFixed(1);
         const chip = document.createElement('span');
         chip.className = 'coverage-alert-chip';
-        chip.textContent = `${name} (${pct}%)`;
+        chip.textContent = `${name} (${pct}%${getHospitalTarget(name) !== 75 ? ` / เป้า ${getHospitalTarget(name)}%` : ''})`;
         chip.title = `คลิกเพื่อกรอง: ${name}`;
         chip.addEventListener('click', () => {
             appState.activeHospitalFilter = name;
@@ -2879,6 +2881,9 @@ function renderTrendSection(rows) {
     else if (tab === 'fiscal') renderTrendFiscal(rows);
     else if (tab === 'heatmap') renderTrendHeatmap(rows);
     else if (tab === 'ranking') renderTrendRanking(rows);
+    else if (tab === 'multify') renderTrendMultiFY(rows);
+    else if (tab === 'scatter') renderTrendScatter(rows);
+    else if (tab === 'map') renderTrendMap(rows);
 }
 
 const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -2980,17 +2985,42 @@ function renderTrendMonthly(rows) {
     const series = isAnemia
         ? [{ name: 'ร้อยละโลหิตจาง', data: anemiaSeries }, ...(hasPrevData ? [{ name: `ปีงบ ${prevFY} (เปรียบเทียบ)`, data: prevAnemiaSeries }] : [])]
         : [{ name: 'ความครอบคลุม (Coverage%)', data: covSeries }, { name: 'อัตราเจาะ HCT%', data: screenSeries }, ...(hasPrevData ? [{ name: `ปีงบ ${prevFY} (Coverage%)`, data: prevCovSeries }] : [])];
+    const colors = isAnemia ? ['#f43f5e', '#94a3b8'] : [TREND_COLORS[0], TREND_COLORS[2], '#94a3b8'];
+    const widths = series.map((_, i) => i === series.length - 1 && hasPrevData ? 1.5 : 2);
+    const dashes = series.map((_, i) => i === series.length - 1 && hasPrevData ? 6 : 0);
+
+    // Linear forecast: project primary series 2 months past last data point
+    const primary = isAnemia ? anemiaSeries : covSeries;
+    const FORECAST_STEPS = 2;
+    const lastLabelIdx = labels.length ? FY_MONTH_LABELS.indexOf(labels[labels.length - 1]) : -1;
+    const steps = Math.min(FORECAST_STEPS, 11 - lastLabelIdx);
+    if (primary.length >= 3 && steps > 0) {
+        const fit = linearRegression(primary);
+        const futureLabels = FY_MONTH_LABELS.slice(lastLabelIdx + 1, lastLabelIdx + 1 + steps);
+        series.forEach(s => { s.data = [...s.data, ...futureLabels.map(() => null)]; });
+        const forecast = [...primary.map(() => null), ...futureLabels.map(() => null)];
+        forecast[primary.length - 1] = primary[primary.length - 1];
+        futureLabels.forEach((_, k) => {
+            const v = fit.slope * (primary.length + k) + fit.intercept;
+            forecast[primary.length + k] = +Math.max(0, Math.min(100, v)).toFixed(1);
+        });
+        series.push({ name: `คาดการณ์ (Linear, ${fit.slope >= 0 ? '+' : ''}${fit.slope.toFixed(1)}%/เดือน)`, data: forecast });
+        labels.push(...futureLabels.map(l => l + '*'));
+        colors.splice(series.length - 1, 0, '#a855f7');
+        widths.push(2);
+        dashes.push(4);
+    }
 
     const mainOpts = {
         chart: { type: 'line', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
         series,
         xaxis: { categories: labels, labels: { style: { fontSize: '11px' } } },
         yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
-        colors: isAnemia ? ['#f43f5e', '#94a3b8'] : [TREND_COLORS[0], TREND_COLORS[2], '#94a3b8'],
-        stroke: { curve: 'smooth', width: [2, 2, 1.5], dashArray: hasPrevData ? (isAnemia ? [0, 6] : [0, 0, 6]) : [0] },
+        colors,
+        stroke: { curve: 'smooth', width: widths, dashArray: dashes },
         markers: { size: 4 },
-        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '10px' } },
-        tooltip: { y: { formatter: v => v + '%' } },
+        dataLabels: { enabled: true, formatter: v => v === null || v === undefined ? '' : v + '%', style: { fontSize: '10px' } },
+        tooltip: { y: { formatter: v => v === null || v === undefined ? '-' : v + '%' } },
         grid: { borderColor: 'rgba(100,116,139,0.15)' },
         legend: { position: 'top' }
     };
@@ -4302,7 +4332,7 @@ function resetAllFilters() {
 // Keyboard shortcuts
 document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-    if (e.key === 'Escape') { resetAllFilters(); closeFilterSheet(); closeDQModal(); }
+    if (e.key === 'Escape') { resetAllFilters(); closeFilterSheet(); closeDQModal(); closeAnnotationModal(); }
     if (e.key === 'F5' && !e.ctrlKey) { e.preventDefault(); loadLocalExcelFile(false); }
     if (e.key === 'd' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleDarkMode(); }
 });
@@ -4441,12 +4471,13 @@ function renderTrendRanking(rows) {
 
     const rows2 = ranked.map((r, i) => {
         const pct = r.curRate.toFixed(1);
-        const target = isAnemia ? (r.curRate <= 16 ? 'met' : '') : (r.curRate >= 75 ? 'met' : '');
+        const target = isAnemia ? (r.curRate <= 16 ? 'met' : '') : (r.curRate >= getHospitalTarget(r.name) ? 'met' : '');
+        const note = getAnnotation(r.name);
         const badgeCls = target === 'met' ? 'color:#15803d;background:rgba(21,128,61,0.1);border:1px solid rgba(21,128,61,0.3);' : 'color:#dc2626;background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);';
         return `<tr>
             <td style="text-align:center;font-weight:700;color:var(--text-muted);">${i + 1}</td>
-            <td style="font-weight:600;">${r.name}</td>
-            <td style="color:var(--text-muted);font-size:0.8rem;">${r.district}</td>
+            <td style="font-weight:600;">${escapeHtml(r.name)} <button class="annot-btn${note ? ' has-note' : ''}" data-hosp="${escapeHtml(r.name)}" title="${note ? escapeHtml(note) : 'เพิ่มหมายเหตุ / ตั้งเป้า'}">${note ? '📝' : '✎'}</button></td>
+            <td style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(r.district)}</td>
             <td style="text-align:center;">${r.total.toLocaleString()}</td>
             <td style="text-align:center;"><span style="padding:3px 10px;border-radius:12px;font-weight:700;${badgeCls}">${pct}%</span></td>
             <td style="text-align:center;">${arrow(r.diff)}</td>
@@ -4469,6 +4500,9 @@ function renderTrendRanking(rows) {
             <tbody>${rows2 || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted);">ไม่มีข้อมูลเปรียบเทียบ</td></tr>'}</tbody>
         </table>
         </div>`;
+    document.querySelectorAll('#trend-chart-main .annot-btn').forEach(btn => {
+        btn.addEventListener('click', () => showAnnotationModal(btn.dataset.hosp));
+    });
 
     // Side: top5 / bottom5 bar
     const top5 = ranked.slice(0, 5);
@@ -4602,3 +4636,457 @@ window.addEventListener('appinstalled', () => {
     if (banner) banner.style.display = 'none';
     showToast('✅ ติดตั้งแอป MCHMUK สำเร็จ!', 'success', 4000);
 });
+
+// ==========================================================================
+// 🧰 Shared helpers
+// ==========================================================================
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function linearRegression(ys) {
+    const n = ys.length;
+    const xMean = (n - 1) / 2;
+    const yMean = ys.reduce((s, v) => s + v, 0) / n;
+    let num = 0, den = 0;
+    ys.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+    const slope = den === 0 ? 0 : num / den;
+    return { slope, intercept: yMean - slope * xMean };
+}
+
+function readLocalJSON(key) {
+    try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; }
+}
+function writeLocalJSON(key, obj) {
+    try { localStorage.setItem(key, JSON.stringify(obj)); return true; } catch (e) { return false; }
+}
+
+// Rows across all FYs, restricted to the active district/hospital filter
+function rawRowsForActiveUnit() {
+    const { ampnameCol, hosnameCol } = trendGetCols();
+    return (appState.rawData || []).filter(r =>
+        (appState.activeDistrictFilter === 'all' || !ampnameCol || String(r[ampnameCol]) === appState.activeDistrictFilter) &&
+        (appState.activeHospitalFilter === 'all' || !hosnameCol || String(r[hosnameCol]) === appState.activeHospitalFilter));
+}
+
+// ==========================================================================
+// 🎯 Per-hospital target override + 📝 annotations (localStorage)
+// ==========================================================================
+const TARGETS_KEY = 'mchmuk-targets';
+const ANNOT_KEY = 'mchmuk-annotations';
+const DEFAULT_COVERAGE_TARGET = 75;
+
+function getHospitalTarget(name) {
+    const t = Number(readLocalJSON(TARGETS_KEY)[name]);
+    return Number.isFinite(t) && t > 0 && t <= 100 ? t : DEFAULT_COVERAGE_TARGET;
+}
+
+function getAnnotation(name) {
+    return readLocalJSON(ANNOT_KEY)[name] || '';
+}
+
+function showAnnotationModal(name) {
+    if (!name || name === 'all') {
+        showToast('เลือกหน่วยบริการก่อน (จากตัวกรองหรือตารางจัดอันดับ)', 'info', 3500);
+        return;
+    }
+    const overlay = document.getElementById('annot-modal-overlay');
+    if (!overlay) return;
+    overlay.dataset.hosp = name;
+    document.getElementById('annot-hosp-name').textContent = name;
+    document.getElementById('annot-text').value = getAnnotation(name);
+    const custom = readLocalJSON(TARGETS_KEY)[name];
+    document.getElementById('annot-target').value = custom ?? '';
+    document.getElementById('annot-target').placeholder = String(DEFAULT_COVERAGE_TARGET);
+    overlay.style.display = 'block';
+    document.getElementById('annot-text').focus();
+}
+
+function closeAnnotationModal() {
+    const overlay = document.getElementById('annot-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+function saveAnnotationModal() {
+    const overlay = document.getElementById('annot-modal-overlay');
+    const name = overlay?.dataset.hosp;
+    if (!name) return;
+    const text = document.getElementById('annot-text').value.trim().slice(0, 1000);
+    const targetRaw = document.getElementById('annot-target').value.trim();
+    const target = targetRaw === '' ? null : Number(targetRaw);
+    if (target !== null && (!Number.isFinite(target) || target <= 0 || target > 100)) {
+        showToast('เป้าหมายต้องเป็นตัวเลข 1–100', 'error', 3500);
+        return;
+    }
+    const notes = readLocalJSON(ANNOT_KEY);
+    if (text) notes[name] = text; else delete notes[name];
+    const targets = readLocalJSON(TARGETS_KEY);
+    if (target !== null && target !== DEFAULT_COVERAGE_TARGET) targets[name] = target; else delete targets[name];
+    if (!writeLocalJSON(ANNOT_KEY, notes) || !writeLocalJSON(TARGETS_KEY, targets)) {
+        showToast('บันทึกไม่สำเร็จ (browser storage ถูกปิด)', 'error', 4000);
+        return;
+    }
+    closeAnnotationModal();
+    showToast(`💾 บันทึก ${name} แล้ว`, 'success', 2500);
+    triggerAnalyticsUpdate();
+}
+
+// ==========================================================================
+// 🔗 Share URL
+// ==========================================================================
+async function shareCurrentView() {
+    syncHashFromState();
+    const url = location.href;
+    try {
+        await navigator.clipboard.writeText(url);
+        showToast('🔗 คัดลอกลิงก์มุมมองปัจจุบันแล้ว', 'success', 3000);
+    } catch (e) {
+        window.prompt('คัดลอกลิงก์นี้:', url);
+    }
+}
+
+// ==========================================================================
+// 📗 Export XLSX (filtered rows + per-hospital summary)
+// ==========================================================================
+function exportXLSX() {
+    if (!appState.filteredData.length || typeof XLSX === 'undefined') return;
+    const headers = appState.headers.filter(h => h !== '__rowIdx__');
+    const wb = XLSX.utils.book_new();
+    const dataSheet = XLSX.utils.json_to_sheet(appState.filteredData.map(r => {
+        const o = {}; headers.forEach(h => { o[h] = r[h]; }); return o;
+    }), { header: headers });
+    XLSX.utils.book_append_sheet(wb, dataSheet, 'Data');
+
+    if (appState.isMophMode) {
+        const { hosnameCol, ampnameCol } = trendGetCols();
+        if (hosnameCol) {
+            const m = {};
+            appState.filteredData.forEach(r => {
+                const h = String(r[hosnameCol] || 'ไม่ทราบ');
+                if (!m[h]) m[h] = { district: ampnameCol ? String(r[ampnameCol] || '') : '', total: 0, received: 0, tested: 0, anemic: 0 };
+                m[h].total++;
+                if (isReceivedValue(r['result'])) m[h].received++;
+                if (cleanNumericValue(r['lab_result_status']) === 1) { m[h].tested++; if (isAnemicRow(r)) m[h].anemic++; }
+            });
+            const summary = Object.entries(m).map(([h, b]) => ({
+                'หน่วยบริการ': h,
+                'อำเภอ': b.district,
+                'เด็กเป้าหมาย': b.total,
+                'ได้รับยา': b.received,
+                'Coverage%': +(b.total ? b.received / b.total * 100 : 0).toFixed(1),
+                'เป้าหมาย%': getHospitalTarget(h),
+                'เจาะ HCT': b.tested,
+                'โลหิตจาง': b.anemic,
+                'โลหิตจาง%': +(b.tested ? b.anemic / b.tested * 100 : 0).toFixed(1),
+                'หมายเหตุ': getAnnotation(h),
+            })).sort((a, b) => b['Coverage%'] - a['Coverage%']);
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summary), 'Summary');
+        }
+    }
+    const stamp = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `mchmuk_${appState.isMophMode ? 'FY' + appState.fiscalYear + '_' : ''}${stamp}.xlsx`);
+    showToast(`📗 Export Excel สำเร็จ! ${appState.filteredData.length.toLocaleString()} แถว`, 'success', 4000);
+}
+
+// ==========================================================================
+// 🔄 Auto-refresh — polls metadata timestamp, reloads only when data changed
+// ==========================================================================
+const AUTO_REFRESH_KEY = 'mchmuk-autorefresh';
+const AUTO_REFRESH_MS = 10 * 60 * 1000;
+let _autoRefreshTimer = null;
+
+async function checkForNewData() {
+    if (document.hidden) return;
+    try {
+        const metaUrl = `https://raw.githubusercontent.com/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/${GITHUB_CONFIG.branch}/tmp_exchange_data_meta.json?cb=${Date.now()}`;
+        const res = await fetch(metaUrl);
+        if (!res.ok) return;
+        const meta = await res.json();
+        if (meta.importTimestamp && meta.importTimestamp !== appState.importTimestamp) {
+            await loadLocalExcelFile(true);
+            showToast('🔄 พบข้อมูลใหม่ — อัปเดตแดชบอร์ดแล้ว', 'success', 4000);
+        }
+    } catch (e) {
+        console.warn('Auto-refresh check failed:', e.message);
+    }
+}
+
+function setAutoRefresh(on) {
+    clearInterval(_autoRefreshTimer);
+    _autoRefreshTimer = on ? setInterval(checkForNewData, AUTO_REFRESH_MS) : null;
+    const btn = document.getElementById('btn-auto-refresh');
+    if (btn) {
+        btn.classList.toggle('auto-refresh-on', on);
+        btn.title = on ? 'Auto-refresh: เปิด (ตรวจทุก 10 นาที) — คลิกเพื่อปิด' : 'Auto-refresh: ปิด — คลิกเพื่อเปิด';
+    }
+    try { localStorage.setItem(AUTO_REFRESH_KEY, on ? '1' : '0'); } catch (e) {}
+}
+
+function toggleAutoRefresh() {
+    const on = !_autoRefreshTimer;
+    setAutoRefresh(on);
+    showToast(on ? '🔄 เปิด Auto-refresh (ทุก 10 นาที)' : '⏸ ปิด Auto-refresh', 'info', 2500);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    let on = false;
+    try { on = localStorage.getItem(AUTO_REFRESH_KEY) === '1'; } catch (e) {}
+    setAutoRefresh(on);
+});
+
+// ==========================================================================
+// 📈 Multi-FY overlay — monthly line per fiscal year
+// ==========================================================================
+function renderTrendMultiFY() {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="layers"></i> เปรียบเทียบรายเดือน ทุกปีงบประมาณ (Overlay)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="bar-chart-3"></i> สะสม ณ เดือนเดียวกัน (YTD)';
+    lucide.createIcons();
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    const fyMap = {};
+    rawRowsForActiveUnit().forEach(r => {
+        const d = parseDateValue(r['epi_date']);
+        if (!d) return;
+        const fy = fiscalYearOf(d);
+        const idx = FY_MONTH_ORDER.indexOf(d.getMonth());
+        if (!fyMap[fy]) fyMap[fy] = FY_MONTH_ORDER.map(() => ({ total: 0, received: 0, tested: 0, anemic: 0 }));
+        const b = fyMap[fy][idx];
+        b.total++;
+        if (isReceivedValue(r['result'])) b.received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { b.tested++; if (isAnemicRow(r)) b.anemic++; }
+    });
+    const fys = Object.keys(fyMap).map(Number).sort((a, b) => a - b);
+    if (!fys.length) {
+        destroyTrendCharts();
+        document.getElementById('trend-chart-main').innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่มีข้อมูลวันที่ (epi_date)</p>';
+        return;
+    }
+    const rate = b => isAnemia ? (b.tested ? b.anemic / b.tested * 100 : null) : (b.total ? b.received / b.total * 100 : null);
+    const series = fys.map(fy => ({ name: `ปีงบ ${fy}`, data: fyMap[fy].map(b => { const v = rate(b); return v === null ? null : +v.toFixed(1); }) }));
+    const palette = ['#cbd5e1', '#94a3b8', '#f59e0b', '#8b5cf6', '#0ea5e9'];
+    const colors = fys.map((fy, i) => fy === appState.fiscalYear ? '#0284c7' : palette[i % palette.length]);
+
+    renderTrendMain(document.getElementById('trend-chart-main'), {
+        chart: { type: 'line', height: chartHeight(), background: 'transparent', foreColor: '#64748b', animations: { enabled: false } },
+        series,
+        xaxis: { categories: FY_MONTH_LABELS },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors,
+        stroke: { curve: 'smooth', width: fys.map(fy => fy === appState.fiscalYear ? 3.5 : 1.8) },
+        markers: { size: fys.map(fy => fy === appState.fiscalYear ? 4 : 0) },
+        annotations: isAnemia ? {} : { yaxis: [{ y: DEFAULT_COVERAGE_TARGET, borderColor: '#16a34a', strokeDashArray: 4, label: { text: `เป้า ${DEFAULT_COVERAGE_TARGET}%`, style: { background: '#16a34a', color: '#fff' } } }] },
+        tooltip: { shared: true, y: { formatter: v => v === null || v === undefined ? '-' : v + '%' } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' },
+        legend: { position: 'top' }
+    });
+
+    // YTD up to the last month that has data in the selected FY, so years compare fairly
+    const cur = fyMap[appState.fiscalYear];
+    let lastIdx = 11;
+    if (cur) { lastIdx = -1; cur.forEach((b, i) => { if (b.total) lastIdx = i; }); if (lastIdx < 0) lastIdx = 11; }
+    const ytd = fys.map(fy => {
+        const agg = fyMap[fy].slice(0, lastIdx + 1).reduce((a, b) => ({ total: a.total + b.total, received: a.received + b.received, tested: a.tested + b.tested, anemic: a.anemic + b.anemic }), { total: 0, received: 0, tested: 0, anemic: 0 });
+        const v = rate(agg);
+        return v === null ? 0 : +v.toFixed(1);
+    });
+    renderTrendSide(document.getElementById('trend-chart-side'), {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: `YTD ถึง ${FY_MONTH_LABELS[lastIdx]}`, data: ytd }],
+        xaxis: { categories: fys.map(fy => 'ปีงบ ' + fy) },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors,
+        plotOptions: { bar: { distributed: true, borderRadius: 4 } },
+        legend: { show: false },
+        dataLabels: { enabled: true, formatter: v => v + '%' },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    });
+}
+
+// ==========================================================================
+// 🔵 Scatter — Coverage vs HCT screening rate per hospital
+// ==========================================================================
+function renderTrendScatter(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="scatter-chart"></i> Coverage vs อัตราเจาะ HCT รายหน่วยบริการ (คลิกจุดเพื่อกรอง)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="grid-2x2"></i> จำนวนหน่วยบริการรายกลุ่ม';
+    lucide.createIcons();
+
+    const { hosnameCol, ampnameCol } = trendGetCols();
+    if (!hosnameCol) {
+        destroyTrendCharts();
+        document.getElementById('trend-chart-main').innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่พบคอลัมน์หน่วยบริการ</p>';
+        return;
+    }
+    const m = {};
+    rows.forEach(r => {
+        const h = String(r[hosnameCol] || 'ไม่ทราบ');
+        if (!m[h]) m[h] = { district: ampnameCol ? String(r[ampnameCol] || 'ไม่ทราบ') : 'ทั้งหมด', total: 0, received: 0, tested: 0 };
+        m[h].total++;
+        if (isReceivedValue(r['result'])) m[h].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) m[h].tested++;
+    });
+    const HCT_REF = 50;
+    const points = Object.entries(m).filter(([, b]) => b.total >= 3).map(([name, b]) => ({
+        name, district: b.district, total: b.total,
+        cov: +(b.received / b.total * 100).toFixed(1),
+        hct: +(b.tested / b.total * 100).toFixed(1),
+        target: getHospitalTarget(name),
+    }));
+    const byDist = {};
+    points.forEach(p => { (byDist[p.district] = byDist[p.district] || []).push(p); });
+    const distNames = Object.keys(byDist).sort();
+    const series = distNames.map(d => ({ name: d, data: byDist[d].map(p => ({ x: p.cov, y: p.hct, meta: p })) }));
+
+    renderTrendMain(document.getElementById('trend-chart-main'), {
+        chart: {
+            type: 'scatter', height: chartHeight(), background: 'transparent', foreColor: '#64748b', animations: { enabled: false },
+            zoom: { enabled: true, type: 'xy' },
+            events: {
+                dataPointSelection: (_e, _ctx, cfg) => {
+                    const p = series[cfg.seriesIndex]?.data[cfg.dataPointIndex]?.meta;
+                    if (!p) return;
+                    appState.activeHospitalFilter = p.name;
+                    const el = document.getElementById('select-hospital');
+                    if (el) el.value = p.name;
+                    applyAllFilters();
+                    showToast(`🏥 กรองข้อมูล: ${p.name}`, 'info', 2500);
+                }
+            }
+        },
+        series,
+        colors: TREND_COLORS.concat(neonColors),
+        xaxis: { type: 'numeric', min: 0, max: 100, tickAmount: 10, title: { text: 'Coverage % (ได้รับยา)' }, labels: { formatter: v => Math.round(v) + '%' } },
+        yaxis: { min: 0, max: 100, tickAmount: 5, title: { text: 'อัตราเจาะ HCT %' }, labels: { formatter: v => Math.round(v) + '%' } },
+        markers: { size: 7, strokeWidth: 1, strokeColors: '#fff' },
+        annotations: {
+            xaxis: [{ x: DEFAULT_COVERAGE_TARGET, borderColor: '#16a34a', strokeDashArray: 4, label: { text: `เป้า ${DEFAULT_COVERAGE_TARGET}%`, style: { background: '#16a34a', color: '#fff' } } }],
+            yaxis: [{ y: HCT_REF, borderColor: '#d97706', strokeDashArray: 4, label: { text: `HCT ${HCT_REF}%`, style: { background: '#d97706', color: '#fff' } } }]
+        },
+        tooltip: {
+            custom: ({ seriesIndex, dataPointIndex }) => {
+                const p = series[seriesIndex].data[dataPointIndex].meta;
+                return `<div style="padding:8px 10px;font-size:0.8rem;"><strong>${escapeHtml(p.name)}</strong><br>${escapeHtml(p.district)} · ${p.total.toLocaleString()} คน<br>Coverage ${p.cov}% (เป้า ${p.target}%)<br>เจาะ HCT ${p.hct}%</div>`;
+            }
+        },
+        legend: { position: 'top' },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    });
+
+    const quad = { 'ผ่านทั้งคู่': 0, 'Coverage ผ่าน / HCT ต่ำ': 0, 'HCT ผ่าน / Coverage ต่ำ': 0, 'ต่ำทั้งคู่': 0 };
+    points.forEach(p => {
+        const c = p.cov >= p.target, h = p.hct >= HCT_REF;
+        quad[c && h ? 'ผ่านทั้งคู่' : c ? 'Coverage ผ่าน / HCT ต่ำ' : h ? 'HCT ผ่าน / Coverage ต่ำ' : 'ต่ำทั้งคู่']++;
+    });
+    renderTrendSide(document.getElementById('trend-chart-side'), {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: 'หน่วยบริการ', data: Object.values(quad) }],
+        xaxis: { categories: Object.keys(quad), labels: { style: { fontSize: '10px' } } },
+        colors: ['#16a34a', '#f59e0b', '#0ea5e9', '#dc2626'],
+        plotOptions: { bar: { distributed: true, horizontal: true, borderRadius: 4 } },
+        legend: { show: false },
+        dataLabels: { enabled: true },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    });
+}
+
+// ==========================================================================
+// 🗺️ District tile map (choropleth) — approximate positions, Mekong to the east
+// ==========================================================================
+const MUK_DISTRICT_TILES = [
+    { key: 'หนองสูง', col: 0, row: 0, w: 1 },
+    { key: 'หว้านใหญ่', col: 2, row: 0, w: 1 },
+    { key: 'ดงหลวง', col: 0, row: 1, w: 1 },
+    { key: 'เมือง', col: 1, row: 1, w: 2, label: 'เมืองมุกดาหาร' },
+    { key: 'คำชะอี', col: 0, row: 2, w: 1 },
+    { key: 'นิคมคำสร้อย', col: 1, row: 2, w: 1 },
+    { key: 'ดอนตาล', col: 2, row: 2, w: 1 },
+];
+
+function renderTrendMap(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="map"></i> แผนที่อำเภอ (ตำแหน่งโดยประมาณ — คลิกเพื่อกรอง)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="bar-chart-3"></i> เรียงลำดับรายอำเภอ';
+    lucide.createIcons();
+    destroyTrendCharts();
+
+    const { ampnameCol } = trendGetCols();
+    const mainEl = document.getElementById('trend-chart-main');
+    if (!ampnameCol) { mainEl.innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่พบคอลัมน์อำเภอ</p>'; return; }
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    const m = {};
+    rows.forEach(r => {
+        const d = String(r[ampnameCol] || 'ไม่ทราบ');
+        if (!m[d]) m[d] = { total: 0, received: 0, tested: 0, anemic: 0 };
+        m[d].total++;
+        if (isReceivedValue(r['result'])) m[d].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { m[d].tested++; if (isAnemicRow(r)) m[d].anemic++; }
+    });
+    const rate = b => isAnemia ? (b.tested ? b.anemic / b.tested * 100 : null) : (b.total ? b.received / b.total * 100 : null);
+    const anemiaTarget = getAnemiaTarget(appState.fiscalYear);
+    const colorFor = v => {
+        if (v === null) return '#e2e8f0';
+        if (isAnemia) return v <= anemiaTarget * 0.6 ? '#86efac' : v <= anemiaTarget ? '#fde68a' : '#fca5a5';
+        return v >= DEFAULT_COVERAGE_TARGET ? '#86efac' : v >= 50 ? '#fde68a' : '#fca5a5';
+    };
+
+    const used = new Set();
+    const tiles = MUK_DISTRICT_TILES.map(t => {
+        const name = Object.keys(m).find(d => !used.has(d) && d.includes(t.key));
+        if (name) used.add(name);
+        return { ...t, name: name || null, b: name ? m[name] : null };
+    });
+    let extraRow = 3;
+    Object.keys(m).filter(d => !used.has(d)).forEach((d, i) => {
+        tiles.push({ key: d, label: d, name: d, b: m[d], col: i % 3, row: extraRow + Math.floor(i / 3), w: 1 });
+    });
+    const rowsCount = Math.max(...tiles.map(t => t.row)) + 1;
+    const TW = 140, TH = 86, GAP = 6;
+    const W = 3 * TW + 2 * GAP + 30, H = rowsCount * (TH + GAP);
+    const svgTiles = tiles.map(t => {
+        const v = t.b ? rate(t.b) : null;
+        const x = t.col * (TW + GAP), y = t.row * (TH + GAP), w = t.w * TW + (t.w - 1) * GAP;
+        const selected = t.name && t.name === appState.activeDistrictFilter;
+        const label = escapeHtml(t.label || t.name || t.key);
+        return `<g class="map-tile${t.name ? '' : ' empty'}" ${t.name ? `data-dist="${escapeHtml(t.name)}" tabindex="0" role="button" aria-label="${label} ${v === null ? 'ไม่มีข้อมูล' : v.toFixed(1) + '%'}"` : ''}>
+            <rect x="${x}" y="${y}" width="${w}" height="${TH}" rx="10" fill="${colorFor(v)}" stroke="${selected ? '#1e293b' : 'rgba(15,23,42,0.15)'}" stroke-width="${selected ? 3 : 1}"/>
+            <text x="${x + w / 2}" y="${y + 32}" text-anchor="middle" font-size="13" font-weight="600" fill="#1e293b">${label}</text>
+            <text x="${x + w / 2}" y="${y + 58}" text-anchor="middle" font-size="20" font-weight="800" fill="#0f172a">${v === null ? '–' : v.toFixed(1) + '%'}</text>
+            ${t.b ? `<text x="${x + w / 2}" y="${y + 76}" text-anchor="middle" font-size="10" fill="#475569">${t.b.total.toLocaleString()} คน</text>` : ''}
+        </g>`;
+    }).join('');
+    const river = `<rect x="${3 * TW + 2 * GAP + 8}" y="0" width="14" height="${3 * (TH + GAP) - GAP}" rx="7" fill="#7dd3fc" opacity="0.6"/>
+        <text x="${3 * TW + 2 * GAP + 15}" y="${(3 * (TH + GAP)) / 2}" text-anchor="middle" font-size="10" fill="#0369a1" transform="rotate(90 ${3 * TW + 2 * GAP + 15} ${(3 * (TH + GAP)) / 2})">แม่น้ำโขง</text>`;
+    const legend = isAnemia
+        ? [['#86efac', `≤${(anemiaTarget * 0.6).toFixed(0)}%`], ['#fde68a', `≤${anemiaTarget}%`], ['#fca5a5', `>${anemiaTarget}%`]]
+        : [['#86efac', `≥${DEFAULT_COVERAGE_TARGET}%`], ['#fde68a', '50–74.9%'], ['#fca5a5', '<50%']];
+
+    mainEl.innerHTML = `<div class="district-map">
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-height:${chartHeight() - 30}px;">${svgTiles}${river}</svg>
+        <div class="district-map-legend">${legend.map(([c, l]) => `<span><i style="background:${c}"></i>${l}</span>`).join('')}<span><i style="background:#e2e8f0"></i>ไม่มีข้อมูล</span></div>
+    </div>`;
+    mainEl.querySelectorAll('.map-tile[data-dist]').forEach(g => {
+        const pick = () => {
+            const dist = g.dataset.dist;
+            appState.activeDistrictFilter = appState.activeDistrictFilter === dist ? 'all' : dist;
+            const el = document.getElementById('select-district');
+            if (el) el.value = appState.activeDistrictFilter;
+            appState.activeHospitalFilter = 'all';
+            applyAllFilters();
+        };
+        g.addEventListener('click', pick);
+        g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    });
+
+    const sorted = Object.entries(m).map(([d, b]) => [d, rate(b)]).filter(([, v]) => v !== null)
+        .sort((a, b) => isAnemia ? a[1] - b[1] : b[1] - a[1]);
+    renderTrendSide(document.getElementById('trend-chart-side'), {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: isAnemia ? 'โลหิตจาง%' : 'Coverage%', data: sorted.map(([, v]) => +v.toFixed(1)) }],
+        xaxis: { categories: sorted.map(([d]) => d), labels: { style: { fontSize: '10px' } } },
+        yaxis: { min: 0, max: 100 },
+        colors: sorted.map(([, v]) => colorFor(v).replace('#86efac', '#16a34a').replace('#fde68a', '#d97706').replace('#fca5a5', '#dc2626')),
+        plotOptions: { bar: { distributed: true, horizontal: true, borderRadius: 3 } },
+        legend: { show: false },
+        dataLabels: { enabled: true, formatter: v => v + '%' },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    });
+}

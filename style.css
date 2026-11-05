@@ -1667,3 +1667,44 @@ footer a:hover {
 
     .trend-charts-grid { grid-template-columns: 1fr !important; }
 }
+
+/* Auto-refresh toggle */
+#btn-auto-refresh.auto-refresh-on {
+    color: #15803d;
+    border-color: #15803d;
+    background: rgba(21, 128, 61, 0.1);
+}
+#btn-auto-refresh.auto-refresh-on svg { animation: spin-slow 4s linear infinite; }
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+    #btn-auto-refresh.auto-refresh-on svg { animation: none; }
+}
+
+/* Ranking annotation button */
+.annot-btn {
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0 4px;
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+.annot-btn:hover, .annot-btn:focus-visible { opacity: 1; border-color: var(--border-light); }
+.annot-btn.has-note { opacity: 1; }
+
+/* District tile map */
+.district-map { display: flex; flex-direction: column; gap: 8px; height: 100%; }
+.district-map .map-tile[data-dist] { cursor: pointer; }
+.district-map .map-tile[data-dist]:hover rect,
+.district-map .map-tile[data-dist]:focus rect { stroke: #0284c7; stroke-width: 2.5; }
+.district-map .map-tile:focus { outline: none; }
+.district-map .map-tile.empty rect { fill: transparent; stroke: rgba(100, 116, 139, 0.25); stroke-dasharray: 4 4; }
+.district-map-legend { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; font-size: 0.75rem; color: var(--text-muted); }
+.district-map-legend span { display: inline-flex; align-items: center; gap: 4px; }
+.district-map-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+@media print {
+    #btn-auto-refresh, #btn-share-url, #btn-annotate, #btn-export-xlsx, .annot-btn { display: none !important; }
+}

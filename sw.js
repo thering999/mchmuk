@@ -1,5 +1,10 @@
 // Bump this string on every deploy to invalidate old caches across all clients.
-const CACHE_NAME = 'mchmuk-v2-20261105';
+const CACHE_NAME = 'mchmuk-v3-20261105';
+const DATASET_URL = 'https://raw.githubusercontent.com/thering999/mchmuk/main/tmp_exchange_data.xlsx';
+// Must match IDB constants in app.js
+const IDB_NAME = 'mchmuk-offline';
+const IDB_STORE = 'datasets';
+const IDB_KEY = 'mchmuk-xlsx-buffer';
 const STATIC_ASSETS = [
     './',
     './index.html',
@@ -28,6 +33,35 @@ self.addEventListener('activate', event => {
         ))
     );
     self.clients.claim();
+});
+
+function idbPut(value) {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+        };
+        req.onerror = e => reject(e.target.error);
+        req.onsuccess = e => {
+            const db = e.target.result;
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put(value, IDB_KEY);
+            tx.oncomplete = () => { db.close(); resolve(); };
+            tx.onerror = ev => { db.close(); reject(ev.target.error); };
+        };
+    });
+}
+
+async function refreshOfflineDataset() {
+    const res = await fetch(`${DATASET_URL}?cb=${Date.now()}`);
+    if (!res.ok) return;
+    const buffer = await res.arrayBuffer();
+    await idbPut({ buffer, savedAt: Date.now() });
+}
+
+self.addEventListener('periodicsync', event => {
+    if (event.tag === 'mchmuk-data-refresh') event.waitUntil(refreshOfflineDataset().catch(() => {}));
 });
 
 self.addEventListener('fetch', event => {
