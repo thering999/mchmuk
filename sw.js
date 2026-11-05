@@ -1,5 +1,5 @@
 // Bump this string on every deploy to invalidate old caches across all clients.
-const CACHE_NAME = 'mchmuk-v3-20261105';
+const CACHE_NAME = 'mchmuk-v4-20261105';
 const DATASET_URL = 'https://raw.githubusercontent.com/thering999/mchmuk/main/tmp_exchange_data.xlsx';
 // Must match IDB constants in app.js
 const IDB_NAME = 'mchmuk-offline';

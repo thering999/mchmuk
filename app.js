@@ -119,7 +119,8 @@ function restoreStateFromHash() {
     if (p.get('hct')) appState.activeHctFilter = p.get('hct');
     if (p.get('district')) appState.activeDistrictFilter = p.get('district');
     if (p.get('hospital')) appState.activeHospitalFilter = p.get('hospital');
-    if (p.get('indicator')) appState.activeMophIndicator = p.get('indicator');
+    const ind = p.get('indicator');
+    if (ind && (ind !== 'wellchild' || hasWellchildData())) appState.activeMophIndicator = ind;
 }
 
 function syncUIControlsFromState() {
@@ -1183,6 +1184,9 @@ function analyzeColumnTypes() {
     });
 }
 
+const WELLCHILD_COL_RE = /wbc_result|wellchild_visit|well.child/i;
+const hasWellchildData = () => appState.headers.some(h => WELLCHILD_COL_RE.test(h));
+
 // MOPH HDC Mode Auto-Detection
 function detectMophIronDataset() {
     const hasHosname = appState.headers.includes('hosname') || appState.headers.includes('hoscode');
@@ -1200,6 +1204,9 @@ function detectMophIronDataset() {
         document.getElementById('moph-hct-filters').style.display = 'flex';
         syncFiscalYearToData();
         updatePeriodControls();
+
+        const wellchildTab = document.querySelector('#moph-indicator-tabs .filter-tab-btn[data-indicator="wellchild"]');
+        if (wellchildTab) wellchildTab.style.display = hasWellchildData() ? '' : 'none';
 
         // Reset indicator tab active state to iron-supplement
         document.querySelectorAll('#moph-indicator-tabs .filter-tab-btn').forEach(t => t.classList.remove('active'));
@@ -1833,7 +1840,7 @@ function renderKPIs() {
 
         } else if (appState.activeMophIndicator === 'wellchild') {
             // --- Well-child / WBC Screening indicator ---
-            const wbcCol = appState.headers.find(h => /wbc_result|wellchild_visit|well.child/i.test(h));
+            const wbcCol = appState.headers.find(h => WELLCHILD_COL_RE.test(h));
             const visitCol = appState.headers.find(h => /visit|attended/i.test(h));
             const total = rows.length;
 
