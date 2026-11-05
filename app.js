@@ -56,7 +56,17 @@ let appState = {
     activeHospitalFilter: "all",
     activeDistrictFilter: "all",
     activeTrendTab: "monthly",
-    importTimestamp: null
+    importTimestamp: null,
+    // Advanced filter & risk state
+    activeRiskFilter: 'all',
+    advFilterAgeMin: null,
+    advFilterAgeMax: null,
+    advFilterLabMin: null,
+    advFilterLabMax: null,
+    advFilterDateFrom: null,
+    advFilterDateTo: null,
+    advFilterAnemia: 'all',
+    _xlsxBuffer: null,
 };
 
 // --- ApexCharts Global Instances ---
@@ -66,13 +76,66 @@ let charts = {
     donut: null,
     radar: null,
     trendMain: null,
-    trendSide: null
+    trendSide: null,
+    scatter: null
 };
 
 // --- Health/Government Theme Color Palette ---
 const neonColors = ['#0284c7', '#16a34a', '#dc2626', '#0d9488', '#f59e0b', '#6366f1', '#65a30d'];
 
 const isNarrowScreen = () => window.innerWidth < 640;
+
+// Web Worker wrapper — parse XLSX off main thread
+function parseExcelWithWorker(buffer, sheetName) {
+    return new Promise((resolve, reject) => {
+        const worker = new Worker('excel-worker.js');
+        worker.onmessage = (e) => { worker.terminate(); if (e.data.error) reject(new Error(e.data.error)); else resolve(e.data); };
+        worker.onerror = (e) => { worker.terminate(); reject(e); };
+        worker.postMessage({ buffer, sheetName }, [buffer]);
+    });
+}
+
+// URL hash — encode active filters so links are shareable
+function syncHashFromState() {
+    if (!appState.isMophMode) return;
+    const p = new URLSearchParams();
+    p.set('fy', appState.fiscalYear);
+    p.set('q', appState.activeQuarter);
+    p.set('age', appState.activeAgeFilter);
+    p.set('hct', appState.activeHctFilter);
+    p.set('district', appState.activeDistrictFilter);
+    p.set('hospital', appState.activeHospitalFilter);
+    p.set('indicator', appState.activeMophIndicator);
+    history.replaceState(null, '', '#' + p.toString());
+}
+
+function restoreStateFromHash() {
+    const hash = location.hash.slice(1);
+    if (!hash) return;
+    const p = new URLSearchParams(hash);
+    if (p.get('fy')) appState.fiscalYear = Number(p.get('fy'));
+    if (p.get('q')) appState.activeQuarter = p.get('q');
+    if (p.get('age')) appState.activeAgeFilter = p.get('age');
+    if (p.get('hct')) appState.activeHctFilter = p.get('hct');
+    if (p.get('district')) appState.activeDistrictFilter = p.get('district');
+    if (p.get('hospital')) appState.activeHospitalFilter = p.get('hospital');
+    if (p.get('indicator')) appState.activeMophIndicator = p.get('indicator');
+}
+
+function syncUIControlsFromState() {
+    const fyEl = document.getElementById('fiscal-year-select');
+    if (fyEl) fyEl.value = String(appState.fiscalYear);
+    const qEl = document.getElementById('quarter-select');
+    if (qEl) qEl.value = appState.activeQuarter;
+    document.querySelectorAll('[data-age-range]').forEach(b => b.classList.toggle('active', b.dataset.ageRange === appState.activeAgeFilter));
+    document.querySelectorAll('[data-hct-status]').forEach(b => b.classList.toggle('active', b.dataset.hctStatus === appState.activeHctFilter));
+    document.querySelectorAll('[data-indicator]').forEach(b => b.classList.toggle('active', b.dataset.indicator === appState.activeMophIndicator));
+    const distEl = document.getElementById('select-district');
+    if (distEl) distEl.value = appState.activeDistrictFilter;
+    const hospEl = document.getElementById('select-hospital');
+    if (hospEl) hospEl.value = appState.activeHospitalFilter;
+}
+
 // Must match .chart-body height in style.css; '100%' resolves against the whole card and overflows
 const chartHeight = () => isNarrowScreen() ? 300 : 340;
 
@@ -335,6 +398,9 @@ window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('login-overlay').style.display = 'flex';
         });
     }
+
+    // Restore filter state from URL hash (shareable links)
+    restoreStateFromHash();
 
     // Initialize authentication listener
     initAuth(onUserLoginSuccess, onUserLogoutSuccess);
@@ -758,39 +824,30 @@ function processFile(file) {
     toggleLoader(true, `กำลังวิเคราะห์ไฟล์ "${file.name}"...`);
 
     const reader = new FileReader();
-    reader.onload = function (e) {
+    reader.onload = async function (e) {
         try {
             const arrayBuffer = e.target.result;
-            const data = new Uint8Array(arrayBuffer);
-            const workbook = XLSX.read(data, {
-                type: 'array',
-                cellDates: true,
-                cellNF: false,
-                cellText: false
-            });
+            appState._xlsxBuffer = arrayBuffer;
 
-            appState.workbook = workbook;
-            appState.sheetNames = workbook.SheetNames;
+            // Parse via Worker — non-blocking
+            const result = await parseExcelWithWorker(arrayBuffer.slice(0), null);
+            const sheetNames = result.sheetNames;
+            const targetSheet = result.targetSheet;
 
-            document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
+            appState.sheetNames = sheetNames;
 
-            // Populating active sheet select
+            document.getElementById('val-sheets').textContent = sheetNames.length;
+
             const sheetSelect = document.getElementById('select-sheet');
             sheetSelect.innerHTML = '';
-            workbook.SheetNames.forEach(sheetName => {
+            sheetNames.forEach(sn => {
                 const opt = document.createElement('option');
-                opt.value = sheetName;
-                opt.textContent = sheetName;
+                opt.value = sn; opt.textContent = sn;
                 sheetSelect.appendChild(opt);
             });
-
-            // Check if MOPH dataset: prioritises the 'DATA' sheet if it exists
-            const hasDataSheet = workbook.SheetNames.includes('DATA');
-            const targetSheet = hasDataSheet ? 'DATA' : workbook.SheetNames[0];
-
             sheetSelect.value = targetSheet;
 
-            loadSheetData(targetSheet);
+            await loadSheetData(targetSheet);
 
             // ☁️ Push to GitHub so ALL users (any device) get the same data!
             const now = new Date().toISOString();
@@ -838,19 +895,29 @@ function processFile(file) {
 }
 
 // Load and parse data from selected sheet
-function loadSheetData(sheetName) {
-    if (!appState.workbook) return;
-
+async function loadSheetData(sheetName) {
     toggleLoader(true, `กำลังอ่านข้อมูลแผ่นงาน [${sheetName}]...`);
     appState.currentSheetName = sheetName;
 
-    const sheet = appState.workbook.Sheets[sheetName];
+    let jsonData, jsonDataText;
 
-    // --- ✅ อ่าน 2 ชุด: parsed (สำหรับคำนวณ) + cellText (สำหรับ export) ---
-    // cellText:true เพิ่ม .w (formatted text) ใน each cell — ใช้ XLSX.read ด้วย cellText:true
-    // แต่เราสร้าง rawDataText แยกจาก sheet object โดยใช้ sheet_to_json raw:false
-    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
-    const jsonDataText = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+    // Use Web Worker if buffer available (non-blocking), else fall back to main thread
+    if (appState._xlsxBuffer) {
+        try {
+            const result = await parseExcelWithWorker(appState._xlsxBuffer.slice(0), sheetName);
+            jsonData = result.rows;
+            jsonDataText = result.rowsText;
+        } catch (workerErr) {
+            console.warn('Worker parse failed, falling back:', workerErr.message);
+        }
+    }
+
+    if (!jsonData) {
+        if (!appState.workbook) { toggleLoader(false); return; }
+        const sheet = appState.workbook.Sheets[sheetName];
+        jsonData = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+        jsonDataText = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+    }
 
     if (jsonData.length === 0) {
         showToast('⚠️ แผ่นงานนี้ไม่มีข้อมูล หรือไม่พบข้อมูลหัวตาราง!', 'warn', 5000);
@@ -1539,14 +1606,63 @@ function applyAllFilters() {
     // 2. Apply Fuzzy Search Query Filter
     const searchQuery = document.getElementById('table-search').value.toLowerCase().trim();
     if (searchQuery !== "") {
+        const searchCols = appState.isMophMode
+            ? appState.headers.filter(h => ['hn','fname','lname','hosp_name','hcode','hoscode','hospcode'].includes(h.toLowerCase()))
+            : null;
         filtered = filtered.filter(row => {
-            return Object.values(row).some(val =>
-                String(val).toLowerCase().includes(searchQuery)
-            );
+            const vals = searchCols && searchCols.length > 0
+                ? searchCols.map(h => row[h])
+                : Object.values(row);
+            return vals.some(val => String(val).toLowerCase().includes(searchQuery));
         });
     }
 
+    // 3. Advanced filter panel
+    if (appState.advFilterAgeMin !== null || appState.advFilterAgeMax !== null) {
+        const ageCol = appState.headers.find(h => h.toLowerCase() === 'age_m');
+        if (ageCol) {
+            filtered = filtered.filter(row => {
+                const age = cleanNumericValue(row[ageCol]);
+                if (appState.advFilterAgeMin !== null && age < appState.advFilterAgeMin) return false;
+                if (appState.advFilterAgeMax !== null && age > appState.advFilterAgeMax) return false;
+                return true;
+            });
+        }
+    }
+    if (appState.advFilterLabMin !== null || appState.advFilterLabMax !== null) {
+        filtered = filtered.filter(row => {
+            const lr = parseFloat(row['labresult']);
+            if (isNaN(lr)) return appState.advFilterLabMin === null;
+            if (appState.advFilterLabMin !== null && lr < appState.advFilterLabMin) return false;
+            if (appState.advFilterLabMax !== null && lr > appState.advFilterLabMax) return false;
+            return true;
+        });
+    }
+    if (appState.advFilterDateFrom || appState.advFilterDateTo) {
+        const dateFrom = appState.advFilterDateFrom ? new Date(appState.advFilterDateFrom) : null;
+        const dateTo = appState.advFilterDateTo ? new Date(appState.advFilterDateTo) : null;
+        if (dateTo) dateTo.setHours(23, 59, 59);
+        filtered = filtered.filter(row => {
+            const labDate = parseDateValue(row['lab_date']) || parseDateValue(row['epi_date']);
+            if (!labDate) return !dateFrom && !dateTo;
+            if (dateFrom && labDate < dateFrom) return false;
+            if (dateTo && labDate > dateTo) return false;
+            return true;
+        });
+    }
+    if (appState.advFilterAnemia !== 'all') {
+        filtered = filtered.filter(row => {
+            const anemic = isAnemicRow(row);
+            return appState.advFilterAnemia === 'yes' ? anemic : !anemic;
+        });
+    }
+    // 4. Risk filter (MOPH mode only)
+    if (appState.isMophMode && appState.activeRiskFilter !== 'all') {
+        filtered = filtered.filter(row => getRiskLevel(row) === appState.activeRiskFilter);
+    }
+
     appState.filteredData = filtered;
+    syncHashFromState();
 }
 
 function handleSheetChange(e) {
@@ -1563,10 +1679,19 @@ function handleDimensionChange() {
     triggerAnalyticsUpdate();
 }
 
+let _searchDebounceTimer = null;
 function handleTableSearch() {
-    applyAllFilters();
-    appState.currentPage = 1;
-    triggerAnalyticsUpdate();
+    clearTimeout(_searchDebounceTimer);
+    _searchDebounceTimer = setTimeout(() => {
+        applyAllFilters();
+        appState.currentPage = 1;
+        triggerAnalyticsUpdate();
+        const countEl = document.getElementById('search-match-count');
+        if (countEl) {
+            const q = document.getElementById('table-search').value.trim();
+            countEl.textContent = q ? `พบ ${appState.filteredData.length.toLocaleString()} รายการ` : '';
+        }
+    }, 300);
 }
 
 // ==========================================================================
@@ -1584,6 +1709,17 @@ function isAnemicRow(r) {
     // anemea: 2 = ซีด (โลหิตจาง), 0 = ปกติ — per table display logic
     const anemea = cleanNumericValue(r['anemea']);
     return anemea === 2 || anemea === 1;
+}
+
+function getRiskLevel(row) {
+    const lt = String(row['labtest'] || '').trim().replace(/,/g, '').replace(/^0+/, '');
+    const lr = parseFloat(row['labresult']);
+    if (!isNaN(lr) && lr > 0) {
+        if (lt === '621201') { if (lr < 28) return 'high'; if (lr < 33) return 'medium'; return 'low'; }
+        if (lt === '621401' || lt === '621402') { if (lr < 9) return 'high'; if (lr < 11) return 'medium'; return 'low'; }
+    }
+    const anemea = cleanNumericValue(row['anemea']);
+    return (anemea === 2 || anemea === 1) ? 'medium' : 'low';
 }
 
 function cleanNumericValue(val) {
@@ -2138,6 +2274,7 @@ function renderMophModeCharts(rows) {
     }
 
     renderTrendSection(rows);
+    renderScatterPlot(rows);
 }
 
 // --- MOPH Indicator: ร้อยละเด็กอายุครบ 12 เดือน มีภาวะโลหิตจาง ---
@@ -2332,6 +2469,7 @@ function renderAnemia12mCharts(rows) {
     else { charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions); charts.radar.render(); }
 
     renderTrendSection(rows);
+    renderScatterPlot(rows);
 }
 
 // --- Generic Multi-dimensional Chart Rendering ---
@@ -2517,9 +2655,12 @@ function renderGenericCharts(rows) {
     if (charts.radar) charts.radar.updateOptions(radarOptions);
     else { charts.radar = new ApexCharts(document.getElementById('chart-radar'), radarOptions); charts.radar.render(); }
 
-    // Hide trend section in generic mode
+    // Hide trend section and scatter in generic mode
     const trendSec = document.getElementById('trend-section');
     if (trendSec) trendSec.style.display = 'none';
+    const scatterCard = document.getElementById('chart-scatter-card');
+    if (scatterCard) scatterCard.style.display = 'none';
+    if (charts.scatter) { charts.scatter.destroy(); charts.scatter = null; }
 }
 
 // ==========================================================================
@@ -2623,17 +2764,39 @@ function renderTrendMonthly(rows) {
         anemiaSeries.push(+(b.tested > 0 ? b.anemic / b.tested * 100 : 0).toFixed(1));
     });
 
+    // Prev fiscal year overlay — use all rawData (unfiltered by FY)
+    const prevFY = appState.fiscalYear - 1;
+    const prevBuckets = {};
+    FY_MONTH_ORDER.forEach(m => { prevBuckets[m] = { total:0, received:0, tested:0, anemic:0 }; });
+    (appState.rawData || []).forEach(r => {
+        const d = parseDateValue(r['epi_date']);
+        if (!d || fiscalYearOf(d) !== prevFY) return;
+        const m = d.getMonth();
+        if (!prevBuckets[m]) return;
+        prevBuckets[m].total++;
+        if (isReceivedValue(r['result'])) prevBuckets[m].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { prevBuckets[m].tested++; if (isAnemicRow(r)) prevBuckets[m].anemic++; }
+    });
+    const prevCovSeries = [], prevAnemiaSeries = [];
+    FY_MONTH_ORDER.forEach((m, i) => {
+        if (!labels.includes(FY_MONTH_LABELS[i])) return; // only months with current-year data
+        const b = prevBuckets[m];
+        prevCovSeries.push(+(b.total > 0 ? b.received / b.total * 100 : 0).toFixed(1));
+        prevAnemiaSeries.push(+(b.tested > 0 ? b.anemic / b.tested * 100 : 0).toFixed(1));
+    });
+    const hasPrevData = isAnemia ? prevAnemiaSeries.some(v => v > 0) : prevCovSeries.some(v => v > 0);
+
     const series = isAnemia
-        ? [{ name: 'ร้อยละโลหิตจาง', data: anemiaSeries }]
-        : [{ name: 'ความครอบคลุม (Coverage%)', data: covSeries }, { name: 'อัตราเจาะ HCT%', data: screenSeries }];
+        ? [{ name: 'ร้อยละโลหิตจาง', data: anemiaSeries }, ...(hasPrevData ? [{ name: `ปีงบ ${prevFY} (เปรียบเทียบ)`, data: prevAnemiaSeries }] : [])]
+        : [{ name: 'ความครอบคลุม (Coverage%)', data: covSeries }, { name: 'อัตราเจาะ HCT%', data: screenSeries }, ...(hasPrevData ? [{ name: `ปีงบ ${prevFY} (Coverage%)`, data: prevCovSeries }] : [])];
 
     const mainOpts = {
         chart: { type: 'line', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
         series,
         xaxis: { categories: labels, labels: { style: { fontSize: '11px' } } },
         yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
-        colors: isAnemia ? ['#f43f5e'] : [TREND_COLORS[0], TREND_COLORS[2]],
-        stroke: { curve: 'smooth', width: 2 },
+        colors: isAnemia ? ['#f43f5e', '#94a3b8'] : [TREND_COLORS[0], TREND_COLORS[2], '#94a3b8'],
+        stroke: { curve: 'smooth', width: [2, 2, 1.5], dashArray: hasPrevData ? (isAnemia ? [0, 6] : [0, 0, 6]) : [0] },
         markers: { size: 4 },
         dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '10px' } },
         tooltip: { y: { formatter: v => v + '%' } },
@@ -2901,28 +3064,118 @@ function renderTrendFiscal(rows) {
     };
     renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
 
-    // Side: bar of annual overall coverage
-    const fyAnnual = sortedFYs.map(fy => {
-        let total=0,received=0,tested=0,anemic=0;
-        [1,2,3,4].forEach(q => {
-            const b = fyQMap[fy][q] || {};
-            total += b.total||0; received += b.received||0; tested += b.tested||0; anemic += b.anemic||0;
+    // Side: grouped bar — district comparison across last 2 fiscal years
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="map-pin"></i> เปรียบเทียบรายอำเภอ (2 ปีงบล่าสุด)';
+    lucide.createIcons();
+    const { ampnameCol, ampcodeCol } = trendGetCols();
+    const prevFYs = sortedFYs.slice(-2);
+    const distCol = ampcodeCol || ampnameCol;
+    if (distCol && prevFYs.length >= 1) {
+        const distFYMap = {};
+        (appState.rawData || []).forEach(r => {
+            const d = parseDateValue(r['epi_date']);
+            if (!d) return;
+            const fy = fiscalYearOf(d);
+            if (!prevFYs.includes(fy)) return;
+            const dist = String(r[distCol] || 'ไม่ทราบ').trim();
+            if (!distFYMap[dist]) distFYMap[dist] = {};
+            if (!distFYMap[dist][fy]) distFYMap[dist][fy] = { total:0,received:0,tested:0,anemic:0 };
+            distFYMap[dist][fy].total++;
+            if (isReceivedValue(r['result'])) distFYMap[dist][fy].received++;
+            if (cleanNumericValue(r['lab_result_status']) === 1) {
+                distFYMap[dist][fy].tested++;
+                if (isAnemicRow(r)) distFYMap[dist][fy].anemic++;
+            }
         });
-        return { fy, rate: isAnemia ? (tested>0?+(anemic/tested*100).toFixed(1):0) : (total>0?+(received/total*100).toFixed(1):0) };
+        const dists = Object.keys(distFYMap).sort();
+        const sideSeriesList = prevFYs.map(fy => ({
+            name: `ปีงบ ${fy}`,
+            data: dists.map(dist => {
+                const b = distFYMap[dist][fy] || { total:0,received:0,tested:0,anemic:0 };
+                if (isAnemia) return +(b.tested>0 ? b.anemic/b.tested*100 : 0).toFixed(1);
+                return +(b.total>0 ? b.received/b.total*100 : 0).toFixed(1);
+            })
+        }));
+        const sideOpts = {
+            chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+            series: sideSeriesList,
+            xaxis: { categories: dists, labels: { style: { fontSize: '10px' }, trim: true, maxHeight: 60 } },
+            yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+            colors: TREND_COLORS,
+            plotOptions: { bar: { borderRadius: 3, columnWidth: '70%' } },
+            dataLabels: { enabled: false },
+            tooltip: { y: { formatter: v => v + '%' } },
+            legend: { position: 'top' },
+            grid: { borderColor: 'rgba(100,116,139,0.15)' }
+        };
+        renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+    } else {
+        // Fallback to annual overall
+        const fyAnnual = sortedFYs.map(fy => {
+            let total=0,received=0,tested=0,anemic=0;
+            [1,2,3,4].forEach(q => { const b = fyQMap[fy][q] || {}; total += b.total||0; received += b.received||0; tested += b.tested||0; anemic += b.anemic||0; });
+            return { fy, rate: isAnemia ? (tested>0?+(anemic/tested*100).toFixed(1):0) : (total>0?+(received/total*100).toFixed(1):0) };
+        });
+        const sideOpts = {
+            chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+            series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'ร้อยละครอบคลุม', data: fyAnnual.map(x => x.rate) }],
+            xaxis: { categories: fyAnnual.map(x => `ปีงบ ${x.fy}`) },
+            yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+            colors: [TREND_COLORS[3]],
+            plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
+            dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '12px' } },
+            tooltip: { y: { formatter: v => v + '%' } },
+            grid: { borderColor: 'rgba(100,116,139,0.15)' }
+        };
+        renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+    }
+}
+
+function renderScatterPlot(rows) {
+    const card = document.getElementById('chart-scatter-card');
+    if (!card) return;
+    card.style.display = 'flex';
+
+    const high = [], medium = [], low = [];
+    rows.forEach(r => {
+        const age = cleanNumericValue(r['age_m']);
+        const lr = parseFloat(r['labresult']);
+        if (isNaN(lr) || lr <= 0 || age <= 0) return;
+        const level = getRiskLevel(r);
+        const point = { x: age, y: lr, hn: r['hn'] || '', nm: ((r['fname'] || '') + ' ' + (r['lname'] || '')).trim() };
+        if (level === 'high') high.push(point);
+        else if (level === 'medium') medium.push(point);
+        else low.push(point);
     });
 
-    const sideOpts = {
-        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
-        series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'ร้อยละครอบคลุม', data: fyAnnual.map(x => x.rate) }],
-        xaxis: { categories: fyAnnual.map(x => `ปีงบ ${x.fy}`) },
-        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
-        colors: [TREND_COLORS[3]],
-        plotOptions: { bar: { borderRadius: 4, columnWidth: '55%' } },
-        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '12px' } },
-        tooltip: { y: { formatter: v => v + '%' } },
-        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    if (high.length + medium.length + low.length === 0) { card.style.display = 'none'; return; }
+
+    const opts = {
+        series: [
+            { name: 'ความเสี่ยงสูง', data: high },
+            { name: 'ความเสี่ยงปานกลาง', data: medium },
+            { name: 'ปกติ', data: low },
+        ],
+        chart: { type: 'scatter', height: 320, background: 'transparent', foreColor: '#475569', toolbar: { show: true }, animations: { enabled: false } },
+        colors: ['#dc2626', '#f59e0b', '#16a34a'],
+        markers: { size: 4, opacity: 0.65 },
+        xaxis: { title: { text: 'อายุ (เดือน)' }, min: 6, max: 60, tickAmount: 9 },
+        yaxis: { title: { text: 'ค่า Lab Result' } },
+        tooltip: {
+            custom({ seriesIndex, dataPointIndex, w }) {
+                const d = w.config.series[seriesIndex].data[dataPointIndex];
+                const hn = d.hn ? `HN: ${d.hn}` : '';
+                const nm = d.nm ? `<br>ชื่อ: ${d.nm}` : '';
+                return `<div style="padding:8px;font-size:12px;line-height:1.6"><strong style="color:${['#dc2626','#f59e0b','#16a34a'][seriesIndex]}">${w.globals.seriesNames[seriesIndex]}</strong><br>อายุ: ${d.x} เดือน<br>Lab: ${d.y}<br>${hn}${nm}</div>`;
+            }
+        },
+        legend: { position: 'top' },
+        grid: { borderColor: 'rgba(15,23,42,0.08)' }
     };
-    renderTrendSide(document.getElementById('trend-chart-side'), sideOpts);
+
+    if (charts.scatter) { charts.scatter.destroy(); charts.scatter = null; }
+    charts.scatter = new ApexCharts(document.getElementById('chart-scatter'), opts);
+    charts.scatter.render();
 }
 
 // ==========================================================================
@@ -2958,6 +3211,12 @@ function renderTable() {
 
     // Clear & Generate Headers
     tableHeader.innerHTML = '';
+    if (appState.isMophMode) {
+        const thRisk = document.createElement('th');
+        thRisk.textContent = 'ความเสี่ยง';
+        thRisk.style.cssText = 'width:76px;min-width:70px;';
+        tableHeader.appendChild(thRisk);
+    }
     appState.headers.forEach(header => {
         const th = document.createElement('th');
         th.textContent = header;
@@ -2991,7 +3250,7 @@ function renderTable() {
     if (pageRows.length === 0) {
         const tr = document.createElement('tr');
         const td = document.createElement('td');
-        td.colSpan = appState.headers.length || 1;
+        td.colSpan = (appState.headers.length || 1) + (appState.isMophMode ? 1 : 0);
         td.style.textAlign = 'center';
         td.style.color = 'var(--text-muted)';
         td.textContent = 'ไม่พบข้อมูลที่ตรงกับการค้นหา';
@@ -3000,6 +3259,19 @@ function renderTable() {
     } else {
         pageRows.forEach(row => {
             const tr = document.createElement('tr');
+            if (appState.isMophMode) {
+                const tdRisk = document.createElement('td');
+                const risk = getRiskLevel(row);
+                if (risk === 'high') {
+                    tdRisk.innerHTML = '<span style="background:rgba(220,38,38,0.12);color:#dc2626;border:1px solid rgba(220,38,38,0.4);border-radius:12px;padding:2px 7px;font-size:0.7rem;font-weight:700;">สูง</span>';
+                    tr.style.background = 'rgba(220,38,38,0.03)';
+                } else if (risk === 'medium') {
+                    tdRisk.innerHTML = '<span style="background:rgba(245,158,11,0.12);color:#d97706;border:1px solid rgba(245,158,11,0.4);border-radius:12px;padding:2px 7px;font-size:0.7rem;font-weight:700;">กลาง</span>';
+                } else {
+                    tdRisk.innerHTML = '<span style="color:var(--text-muted);font-size:0.75rem;">-</span>';
+                }
+                tr.appendChild(tdRisk);
+            }
             appState.headers.forEach(header => {
                 const td = document.createElement('td');
                 const val = row[header];
@@ -3213,6 +3485,97 @@ function exportJSON() {
     showToast(`📥 Export JSON สำเร็จ! ${appState.filteredData.length.toLocaleString()} แถว`, 'success', 4000);
 }
 
+// Print / save as PDF — browser's native print dialog
+function printReport() {
+    const printWin = window.open('', '_blank');
+    if (!printWin) { showToast('⚠️ เบราว์เซอร์บล็อก popup — กรุณาอนุญาต popup แล้วลองใหม่', 'warn', 4000); return; }
+
+    const fy = appState.fiscalYear || '';
+    const rows = appState.filteredData || [];
+    const received = appState.isMophMode ? rows.filter(r => isReceivedValue(r['result'])).length : null;
+    const coverage = received !== null && rows.length > 0 ? (received / rows.length * 100).toFixed(1) : null;
+    const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
+    const anemiaRate = totalTested > 0 ? (totalAnemia / totalTested * 100).toFixed(1) : null;
+
+    const now = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+    const kpiRows = appState.isMophMode ? `
+        <tr><th>ปีงบประมาณ</th><td>${fy}</td></tr>
+        <tr><th>เด็กกลุ่มเป้าหมาย</th><td>${rows.length.toLocaleString()} ราย</td></tr>
+        <tr><th>ได้รับยาเสริมธาตุเหล็ก</th><td>${received !== null ? received.toLocaleString() + ' ราย' : '-'}</td></tr>
+        <tr><th>ร้อยละครอบคลุม</th><td>${coverage !== null ? coverage + '%' : '-'}</td></tr>
+        <tr><th>เจาะ Lab HCT</th><td>${totalTested.toLocaleString()} ราย</td></tr>
+        <tr><th>โลหิตจาง</th><td>${totalAnemia.toLocaleString()} ราย (${anemiaRate !== null ? anemiaRate + '%' : '-'})</td></tr>
+    ` : `<tr><th>จำนวนแถว</th><td>${rows.length.toLocaleString()}</td></tr>`;
+
+    printWin.document.write(`<!DOCTYPE html><html lang="th"><head>
+        <meta charset="UTF-8">
+        <title>รายงาน MCHMUK HDC มุกดาหาร ปีงบ ${fy}</title>
+        <style>
+            body { font-family: 'Sarabun', 'Tahoma', sans-serif; font-size: 13px; color: #0f172a; margin: 24px; }
+            h1 { font-size: 16px; text-align: center; margin-bottom: 4px; }
+            .sub { text-align: center; color: #64748b; font-size: 11px; margin-bottom: 20px; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+            th { background: #f1f5f9; font-weight: 600; }
+            @media print { @page { margin: 15mm; } }
+        </style>
+    </head><body>
+        <h1>รายงานสรุป HDC มุกดาหาร — ${appState.isMophMode ? 'ยาเสริมธาตุเหล็ก/โลหิตจาง' : appState.currentSheetName}</h1>
+        <p class="sub">พิมพ์เมื่อ ${now} น.</p>
+        <table><tbody>${kpiRows}</tbody></table>
+    </body></html>`);
+    printWin.document.close();
+    printWin.focus();
+    setTimeout(() => { printWin.print(); printWin.close(); }, 400);
+}
+
+function exportExcel() {
+    if (!appState.filteredData || appState.filteredData.length === 0) {
+        showToast('⚠️ ไม่มีข้อมูลสำหรับ Export', 'warn', 3000);
+        return;
+    }
+    try {
+        const wb = XLSX.utils.book_new();
+
+        // Sheet 1: KPI Summary
+        const rows = appState.filteredData;
+        const kpiData = [['ตัวชี้วัด', 'ค่า']];
+        if (appState.isMophMode) {
+            const received = rows.filter(r => isReceivedValue(r['result'])).length;
+            const totalTested = appState.preHctTestedCount != null ? appState.preHctTestedCount : rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+            const totalAnemia = appState.preHctAnemiaCount != null ? appState.preHctAnemiaCount : rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
+            const base = appState.preHctFilterCount > 0 ? appState.preHctFilterCount : rows.length;
+            kpiData.push(['ปีงบประมาณ', appState.fiscalYear]);
+            kpiData.push(['จำนวนเด็กกลุ่มเป้าหมาย (ราย)', rows.length]);
+            kpiData.push(['ได้รับยาเสริมธาตุเหล็ก (ราย)', received]);
+            kpiData.push(['ร้อยละครอบคลุม (%)', rows.length > 0 ? +(received / rows.length * 100).toFixed(2) : 0]);
+            kpiData.push(['เจาะ Lab HCT (ราย)', totalTested]);
+            kpiData.push(['ร้อยละการเจาะ Lab (%)', base > 0 ? +(totalTested / base * 100).toFixed(2) : 0]);
+            kpiData.push(['โลหิตจาง (ราย)', totalAnemia]);
+        } else {
+            kpiData.push(['จำนวนแถวทั้งหมด', rows.length]);
+        }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiData), 'KPI Summary');
+
+        // Sheet 2: Filtered Data
+        const exportHeaders = appState.headers.filter(h => h !== '__rowIdx__');
+        const dataArray = [exportHeaders, ...appState.filteredData.map(row => exportHeaders.map(h => getExportValue(row, h)))];
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(dataArray), 'ข้อมูล');
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        XLSX.writeFile(wb, `รายงาน_MCHMUK_${dateStr}.xlsx`);
+        showToast(`📥 Export Excel สำเร็จ! ${appState.filteredData.length.toLocaleString()} แถว`, 'success', 4000);
+    } catch(err) {
+        showToast(`❌ Export Excel ล้มเหลว: ${err.message}`, 'error', 5000);
+    }
+}
+
+function exportPDF() {
+    window.print();
+}
+
 // ==========================================================================
 // 🧪 Mock / Local Data Integration (Zero-Friction Fallbacks)
 // ==========================================================================
@@ -3287,20 +3650,17 @@ async function loadLocalExcelFile(isSilent = false) {
         if (!response.ok) throw new Error(`HTTP ${response.status}: ไม่พบไฟล์ข้อมูลบน server`);
 
         const buffer = await response.arrayBuffer();
-        const data = new Uint8Array(buffer);
-        const workbook = XLSX.read(data, {
-            type: 'array',
-            cellDates: true,
-            cellNF: false,
-            cellText: false
-        });
+        appState._xlsxBuffer = buffer;
 
-        appState.workbook = workbook;
-        appState.sheetNames = workbook.SheetNames;
+        // Parse via Worker — non-blocking
+        const workerResult = await parseExcelWithWorker(buffer.slice(0), null);
+        const sheetNames = workerResult.sheetNames;
+
+        appState.sheetNames = sheetNames;
 
         document.getElementById('val-filename').textContent = GITHUB_CONFIG.filePath;
         document.getElementById('val-filesize').textContent = formatBytes(buffer.byteLength);
-        document.getElementById('val-sheets').textContent = workbook.SheetNames.length;
+        document.getElementById('val-sheets').textContent = sheetNames.length;
 
         // ดึงวันเวลานำเข้าข้อมูลจริงจาก Metadata JSON หรือ Commit ล่าสุดของ GitHub
         let commitDateStr = null;
@@ -3359,18 +3719,19 @@ async function loadLocalExcelFile(isSilent = false) {
 
         const sheetSelect = document.getElementById('select-sheet');
         sheetSelect.innerHTML = '';
-        workbook.SheetNames.forEach(sheetName => {
+        sheetNames.forEach(sn => {
             const opt = document.createElement('option');
-            opt.value = sheetName;
-            opt.textContent = sheetName;
+            opt.value = sn; opt.textContent = sn;
             sheetSelect.appendChild(opt);
         });
 
-        const hasDataSheet = workbook.SheetNames.includes('DATA');
-        const targetSheet = hasDataSheet ? 'DATA' : workbook.SheetNames[0];
+        const targetSheet = workerResult.targetSheet;
         sheetSelect.value = targetSheet;
 
-        loadSheetData(targetSheet);
+        // Restore hash filters before rendering if hash present
+        if (location.hash) { restoreStateFromHash(); syncUIControlsFromState(); }
+
+        await loadSheetData(targetSheet);
 
         document.getElementById('val-status').textContent = "เปิดทำงานปกติ";
         document.getElementById('val-status').className = "status-badge success";

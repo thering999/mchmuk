@@ -698,6 +698,7 @@
                     <div class="table-actions">
                         <button class="btn btn-secondary" id="btn-export-csv"><i data-lucide="download"></i> Export CSV</button>
                         <button class="btn btn-secondary" id="btn-export-json"><i data-lucide="code"></i> Export JSON</button>
+                        <button class="btn btn-secondary" id="btn-print-report" onclick="printReport()"><i data-lucide="printer"></i> พิมพ์/PDF</button>
                     </div>
                 </div>
                 
@@ -749,5 +750,16 @@
     
     <!-- Main Application Javascript Logic -->
     <script src="app.js?v=1.6.3"></script>
+
+    <!-- Service Worker registration — offline cache + faster repeat loads -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.warn('SW registration failed:', err));
+            });
+        }
+    </script>
 </body>
 </html>
