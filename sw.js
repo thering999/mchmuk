@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
     './auth.js',
     './hospitals_db.js',
     './excel-worker.js',
+    './manifest.json',
     'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
     'https://cdn.jsdelivr.net/npm/apexcharts',
     'https://unpkg.com/lucide@latest',

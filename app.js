@@ -2877,6 +2877,8 @@ function renderTrendSection(rows) {
     else if (tab === 'district') renderTrendDistrict(rows);
     else if (tab === 'unit') renderTrendUnit(rows);
     else if (tab === 'fiscal') renderTrendFiscal(rows);
+    else if (tab === 'heatmap') renderTrendHeatmap(rows);
+    else if (tab === 'ranking') renderTrendRanking(rows);
 }
 
 const THAI_MONTHS_SHORT = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
@@ -2899,6 +2901,10 @@ function destroyTrendCharts() {
 
 function renderTrendMain(el, options) {
     if (charts.trendMain) { charts.trendMain.destroy(); charts.trendMain = null; }
+    // Enable download toolbar unless caller already set one
+    if (options.chart && !options.chart.toolbar) {
+        options.chart.toolbar = { show: true, tools: { download: true, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: false } };
+    }
     charts.trendMain = new ApexCharts(el, options);
     charts.trendMain.render();
 }
@@ -4237,3 +4243,362 @@ async function getActiveDataset() {
         return null;
     }
 }
+
+// ==========================================================================
+// 🌙 Dark Mode
+// ==========================================================================
+function toggleDarkMode() {
+    const html = document.documentElement;
+    const isDark = html.getAttribute('data-theme') === 'dark';
+    html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    const icon = document.getElementById('dark-mode-icon');
+    if (icon) icon.setAttribute('data-lucide', isDark ? 'moon' : 'sun');
+    lucide.createIcons();
+    try { localStorage.setItem('mchmuk-theme', isDark ? 'light' : 'dark'); } catch (e) {}
+}
+
+(function applyStoredTheme() {
+    try {
+        const t = localStorage.getItem('mchmuk-theme');
+        if (t) {
+            document.documentElement.setAttribute('data-theme', t);
+            // Update icon after DOM is ready
+            window.addEventListener('DOMContentLoaded', () => {
+                const icon = document.getElementById('dark-mode-icon');
+                if (icon) icon.setAttribute('data-lucide', t === 'dark' ? 'sun' : 'moon');
+            }, { once: true });
+        }
+    } catch (e) {}
+})();
+
+// ==========================================================================
+// 🔄 Reset All Filters
+// ==========================================================================
+function resetAllFilters() {
+    if (!appState.isMophMode) return;
+    appState.activeAgeFilter = 'all';
+    appState.activeHctFilter = 'all';
+    appState.activeDistrictFilter = 'all';
+    appState.activeHospitalFilter = 'all';
+    appState.activeQuarter = 'all';
+    appState.activeRiskFilter = 'all';
+    appState.advFilterAgeMin = null;
+    appState.advFilterAgeMax = null;
+    appState.advFilterLabMin = null;
+    appState.advFilterLabMax = null;
+    appState.advFilterDateFrom = null;
+    appState.advFilterDateTo = null;
+    appState.advFilterAnemia = 'all';
+    // reset UI controls
+    const q = document.getElementById('quarter-select'); if (q) q.value = 'all';
+    const d = document.getElementById('select-district'); if (d) d.value = 'all';
+    const h = document.getElementById('select-hospital'); if (h) h.value = 'all';
+    document.querySelectorAll('[data-age-range]').forEach(b => b.classList.toggle('active', b.dataset.ageRange === 'all'));
+    document.querySelectorAll('[data-hct-status]').forEach(b => b.classList.toggle('active', b.dataset.hctStatus === 'all'));
+    applyAllFilters();
+    showToast('🔄 ล้าง Filter ทั้งหมดแล้ว', 'info', 2500);
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'Escape') { resetAllFilters(); closeFilterSheet(); closeDQModal(); }
+    if (e.key === 'F5' && !e.ctrlKey) { e.preventDefault(); loadLocalExcelFile(false); }
+    if (e.key === 'd' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); toggleDarkMode(); }
+});
+
+// ==========================================================================
+// 📊 Heatmap: District × Month Coverage
+// ==========================================================================
+function renderTrendHeatmap(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="grid"></i> Heatmap: ความครอบคลุมรายอำเภอ × เดือน (%)';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="bar-chart-3"></i> ค่าเฉลี่ยรายอำเภอ';
+    lucide.createIcons();
+
+    const { ampnameCol } = trendGetCols();
+    if (!ampnameCol) {
+        destroyTrendCharts();
+        document.getElementById('trend-chart-main').innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่พบคอลัมน์อำเภอ</p>';
+        return;
+    }
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    // Build dist × month map
+    const dists = [...new Set(rows.map(r => String(r[ampnameCol] || 'ไม่ทราบ')))].sort();
+    const mapData = {};
+    dists.forEach(d => { mapData[d] = {}; FY_MONTH_ORDER.forEach(m => { mapData[d][m] = { total: 0, received: 0, tested: 0, anemic: 0 }; }); });
+
+    rows.forEach(r => {
+        const dist = String(r[ampnameCol] || 'ไม่ทราบ');
+        const date = parseDateValue(r['epi_date']);
+        if (!date || !mapData[dist]) return;
+        const m = date.getMonth();
+        if (mapData[dist][m] === undefined) return;
+        mapData[dist][m].total++;
+        if (isReceivedValue(r['result'])) mapData[dist][m].received++;
+        if (cleanNumericValue(r['lab_result_status']) === 1) { mapData[dist][m].tested++; if (isAnemicRow(r)) mapData[dist][m].anemic++; }
+    });
+
+    const series = dists.map(dist => ({
+        name: dist,
+        data: FY_MONTH_ORDER.map((m, i) => {
+            const b = mapData[dist][m];
+            const val = isAnemia
+                ? (b.tested > 0 ? +(b.anemic / b.tested * 100).toFixed(1) : 0)
+                : (b.total > 0 ? +(b.received / b.total * 100).toFixed(1) : 0);
+            return { x: FY_MONTH_LABELS[i], y: val };
+        })
+    }));
+
+    const opts = {
+        chart: { type: 'heatmap', height: Math.max(240, dists.length * 32 + 60), background: 'transparent', foreColor: '#64748b', toolbar: { show: true, tools: { download: true } }, animations: { enabled: false } },
+        series,
+        dataLabels: { enabled: true, style: { fontSize: '10px', colors: ['#1e293b'] } },
+        colors: isAnemia ? ['#ef4444'] : ['#0ea5e9'],
+        plotOptions: { heatmap: { shadeIntensity: 0.5, colorScale: { ranges: isAnemia
+            ? [{ from: 0, to: 10, color: '#bbf7d0', name: 'ต่ำ' }, { from: 10.1, to: 16, color: '#fde68a', name: 'กลาง' }, { from: 16.1, to: 100, color: '#fca5a5', name: 'สูง' }]
+            : [{ from: 0, to: 50, color: '#fca5a5', name: 'ต่ำกว่าเป้า' }, { from: 50.1, to: 74.9, color: '#fde68a', name: 'ใกล้เป้า' }, { from: 75, to: 100, color: '#bbf7d0', name: 'ผ่านเป้า' }]
+        } } },
+        tooltip: { y: { formatter: v => v + '%' } },
+        xaxis: { labels: { style: { fontSize: '10px' } } }
+    };
+    renderTrendMain(document.getElementById('trend-chart-main'), opts);
+
+    // Side: average per district
+    const avgVals = dists.map(dist => {
+        const vals = FY_MONTH_ORDER.map(m => { const b = mapData[dist][m]; return isAnemia ? (b.tested > 0 ? b.anemic / b.tested * 100 : 0) : (b.total > 0 ? b.received / b.total * 100 : 0); }).filter(v => v > 0);
+        return vals.length ? +(vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1) : 0;
+    });
+    renderTrendSide(document.getElementById('trend-chart-side'), {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: 'ค่าเฉลี่ย%', data: avgVals }],
+        xaxis: { categories: dists, labels: { style: { fontSize: '10px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: [TREND_COLORS[0]],
+        plotOptions: { bar: { horizontal: true, borderRadius: 3 } },
+        dataLabels: { enabled: true, formatter: v => v + '%', style: { fontSize: '10px', colors: ['#64748b'] } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    });
+}
+
+// ==========================================================================
+// 🏆 Ranking Table — hospitals with trend arrows
+// ==========================================================================
+function renderTrendRanking(rows) {
+    document.getElementById('trend-chart-main-title').innerHTML = '<i data-lucide="trophy"></i> จัดอันดับหน่วยบริการ';
+    document.getElementById('trend-chart-side-title').innerHTML = '<i data-lucide="bar-chart-2"></i> สรุป Top/Bottom 5';
+    lucide.createIcons();
+    destroyTrendCharts();
+
+    const { hosnameCol, ampnameCol } = trendGetCols();
+    if (!hosnameCol) {
+        document.getElementById('trend-chart-main').innerHTML = '<p style="padding:20px;color:var(--text-muted);">ไม่พบคอลัมน์หน่วยบริการ</p>';
+        return;
+    }
+
+    const isAnemia = appState.activeMophIndicator === 'anemia-12m';
+    const curFY = appState.fiscalYear;
+    const prevFY = curFY - 1;
+
+    // Build maps for current and previous FY
+    const buildMap = (data, fy) => {
+        const m = {};
+        data.forEach(r => {
+            const d = parseDateValue(r['epi_date']);
+            if (!d || fiscalYearOf(d) !== fy) return;
+            const h = String(r[hosnameCol] || 'ไม่ทราบ');
+            if (!m[h]) m[h] = { total: 0, received: 0, tested: 0, anemic: 0, district: ampnameCol ? String(r[ampnameCol] || '') : '' };
+            m[h].total++;
+            if (isReceivedValue(r['result'])) m[h].received++;
+            if (cleanNumericValue(r['lab_result_status']) === 1) { m[h].tested++; if (isAnemicRow(r)) m[h].anemic++; }
+        });
+        return m;
+    };
+    const curMap = buildMap(appState.rawData || rows, curFY);
+    const prevMap = buildMap(appState.rawData || rows, prevFY);
+
+    const getRate = (b) => isAnemia ? (b.tested > 0 ? b.anemic / b.tested * 100 : 0) : (b.total > 0 ? b.received / b.total * 100 : 0);
+    const ranked = Object.entries(curMap)
+        .map(([name, cur]) => {
+            const curRate = getRate(cur);
+            const prev = prevMap[name];
+            const prevRate = prev ? getRate(prev) : null;
+            const diff = prevRate !== null ? curRate - prevRate : null;
+            return { name, district: cur.district, total: cur.total, curRate, prevRate, diff };
+        })
+        .filter(r => r.total >= 3)
+        .sort((a, b) => isAnemia ? a.curRate - b.curRate : b.curRate - a.curRate);
+
+    const arrow = (diff) => {
+        if (diff === null) return '<span style="color:#94a3b8;">–</span>';
+        const isGood = isAnemia ? diff < 0 : diff > 0;
+        const isNeutral = Math.abs(diff) < 0.5;
+        if (isNeutral) return `<span style="color:#94a3b8;">→ ทรง</span>`;
+        return isGood
+            ? `<span style="color:#15803d;">▲ +${Math.abs(diff).toFixed(1)}%</span>`
+            : `<span style="color:#dc2626;">▼ -${Math.abs(diff).toFixed(1)}%</span>`;
+    };
+
+    const rows2 = ranked.map((r, i) => {
+        const pct = r.curRate.toFixed(1);
+        const target = isAnemia ? (r.curRate <= 16 ? 'met' : '') : (r.curRate >= 75 ? 'met' : '');
+        const badgeCls = target === 'met' ? 'color:#15803d;background:rgba(21,128,61,0.1);border:1px solid rgba(21,128,61,0.3);' : 'color:#dc2626;background:rgba(220,38,38,0.08);border:1px solid rgba(220,38,38,0.2);';
+        return `<tr>
+            <td style="text-align:center;font-weight:700;color:var(--text-muted);">${i + 1}</td>
+            <td style="font-weight:600;">${r.name}</td>
+            <td style="color:var(--text-muted);font-size:0.8rem;">${r.district}</td>
+            <td style="text-align:center;">${r.total.toLocaleString()}</td>
+            <td style="text-align:center;"><span style="padding:3px 10px;border-radius:12px;font-weight:700;${badgeCls}">${pct}%</span></td>
+            <td style="text-align:center;">${arrow(r.diff)}</td>
+        </tr>`;
+    }).join('');
+
+    document.getElementById('trend-chart-main').innerHTML = `
+        <div style="overflow-x:auto;max-height:420px;overflow-y:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+            <thead style="position:sticky;top:0;background:var(--bg-card,white);">
+                <tr style="border-bottom:2px solid var(--border-light);">
+                    <th style="padding:8px 6px;text-align:center;color:var(--text-muted);">#</th>
+                    <th style="padding:8px 6px;text-align:left;">หน่วยบริการ</th>
+                    <th style="padding:8px 6px;text-align:left;">อำเภอ</th>
+                    <th style="padding:8px 6px;text-align:center;">เด็ก</th>
+                    <th style="padding:8px 6px;text-align:center;">${isAnemia ? 'โลหิตจาง%' : 'Coverage%'}</th>
+                    <th style="padding:8px 6px;text-align:center;">เทียบปีก่อน</th>
+                </tr>
+            </thead>
+            <tbody>${rows2 || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--text-muted);">ไม่มีข้อมูลเปรียบเทียบ</td></tr>'}</tbody>
+        </table>
+        </div>`;
+
+    // Side: top5 / bottom5 bar
+    const top5 = ranked.slice(0, 5);
+    const bot5 = ranked.slice(-5).reverse();
+    const sideLabels = [...top5.map(r => r.name.slice(0, 12)), '---', ...bot5.map(r => r.name.slice(0, 12))];
+    const sideVals = [...top5.map(r => r.curRate), null, ...bot5.map(r => r.curRate)];
+    const sideColors = [...top5.map(r => isAnemia ? (r.curRate <= 16 ? '#10b981' : '#ef4444') : (r.curRate >= 75 ? '#10b981' : '#ef4444')), '#94a3b8', ...bot5.map(r => isAnemia ? (r.curRate <= 16 ? '#10b981' : '#ef4444') : (r.curRate >= 75 ? '#10b981' : '#ef4444'))];
+    renderTrendSide(document.getElementById('trend-chart-side'), {
+        chart: { type: 'bar', height: chartHeight(), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        series: [{ name: isAnemia ? 'โลหิตจาง%' : 'Coverage%', data: sideVals.filter(v => v !== null) }],
+        xaxis: { categories: sideLabels.filter((_, i) => sideVals[i] !== null), labels: { style: { fontSize: '9px' } } },
+        yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
+        colors: sideColors.filter((_, i) => sideVals[i] !== null),
+        plotOptions: { bar: { distributed: true, horizontal: false, borderRadius: 3 } },
+        legend: { show: false },
+        dataLabels: { enabled: true, formatter: v => v.toFixed(1) + '%', style: { fontSize: '9px', colors: ['#64748b'] } },
+        grid: { borderColor: 'rgba(100,116,139,0.15)' }
+    });
+}
+
+// ==========================================================================
+// 🔍 Data Quality Report
+// ==========================================================================
+function showDataQualityReport() {
+    const overlay = document.getElementById('dq-modal-overlay');
+    const content = document.getElementById('dq-content');
+    if (!overlay || !content) return;
+
+    const rows = appState.rawData || appState.filteredData || [];
+    const headers = appState.headers || [];
+
+    if (rows.length === 0 || headers.length === 0) {
+        content.innerHTML = '<p style="color:var(--text-muted);padding:20px;">ยังไม่มีข้อมูล</p>';
+        overlay.style.display = 'flex';
+        lucide.createIcons();
+        return;
+    }
+
+    // Missing value analysis
+    const colStats = headers.filter(h => h !== '__rowIdx__').map(h => {
+        const vals = rows.map(r => r[h]);
+        const missing = vals.filter(v => v === null || v === undefined || v === '').length;
+        const missRate = (missing / rows.length * 100).toFixed(1);
+        return { h, missing, missRate: parseFloat(missRate) };
+    }).sort((a, b) => b.missRate - a.missRate);
+
+    // Duplicate HN detection
+    const hnCol = headers.find(h => /^hn$|^patient_hn$|^cid$/i.test(h));
+    let dupHTML = '';
+    if (hnCol) {
+        const counts = {};
+        rows.forEach(r => { const v = String(r[hnCol] || ''); if (v) counts[v] = (counts[v] || 0) + 1; });
+        const dups = Object.entries(counts).filter(([, c]) => c > 1).sort((a, b) => b[1] - a[1]);
+        dupHTML = `<div style="margin-top:16px;">
+            <h4 style="font-size:0.85rem;font-weight:700;margin-bottom:8px;color:var(--text-secondary);">
+                <i data-lucide="copy" style="width:14px;height:14px;vertical-align:middle;"></i>
+                ตรวจสอบ ${hnCol} ซ้ำ — พบ ${dups.length.toLocaleString()} รายการซ้ำ จาก ${Object.keys(counts).length.toLocaleString()} HN ทั้งหมด
+            </h4>
+            ${dups.length > 0 ? `<div style="max-height:120px;overflow-y:auto;font-size:0.75rem;border:1px solid var(--border-light);border-radius:6px;padding:8px;">
+                ${dups.slice(0, 50).map(([v, c]) => `<span style="display:inline-block;margin:2px 4px;padding:2px 8px;background:rgba(220,38,38,0.08);border-radius:10px;color:#dc2626;">${v} ×${c}</span>`).join('')}
+                ${dups.length > 50 ? `<span style="color:var(--text-muted);">...และอีก ${dups.length - 50} รายการ</span>` : ''}
+            </div>` : '<span style="color:#15803d;font-size:0.82rem;">✓ ไม่พบรายการซ้ำ</span>'}
+        </div>`;
+    }
+
+    const missRows = colStats.map(s => {
+        const bg = s.missRate > 20 ? 'rgba(220,38,38,0.08)' : s.missRate > 5 ? 'rgba(245,158,11,0.08)' : 'transparent';
+        const col = s.missRate > 20 ? '#dc2626' : s.missRate > 5 ? '#d97706' : '#15803d';
+        return `<tr style="background:${bg};">
+            <td style="padding:4px 8px;font-size:0.8rem;font-weight:500;">${s.h}</td>
+            <td style="padding:4px 8px;text-align:center;font-size:0.8rem;">${s.missing.toLocaleString()}</td>
+            <td style="padding:4px 8px;text-align:center;"><span style="color:${col};font-weight:700;">${s.missRate}%</span></td>
+        </tr>`;
+    }).join('');
+
+    content.innerHTML = `
+        <div style="margin-bottom:12px;padding:10px 14px;background:rgba(2,132,199,0.06);border-radius:8px;font-size:0.82rem;color:var(--text-secondary);">
+            <strong>ข้อมูลทั้งหมด:</strong> ${rows.length.toLocaleString()} แถว · ${headers.length} คอลัมน์
+        </div>
+        <h4 style="font-size:0.85rem;font-weight:700;margin-bottom:8px;color:var(--text-secondary);">
+            <i data-lucide="alert-circle" style="width:14px;height:14px;vertical-align:middle;"></i>
+            ข้อมูลว่าง (Missing Values) รายคอลัมน์
+        </h4>
+        <div style="max-height:240px;overflow-y:auto;border:1px solid var(--border-light);border-radius:8px;">
+            <table style="width:100%;border-collapse:collapse;">
+                <thead style="position:sticky;top:0;background:var(--bg-card,white);">
+                    <tr style="border-bottom:1px solid var(--border-light);">
+                        <th style="padding:6px 8px;text-align:left;font-size:0.78rem;color:var(--text-muted);">คอลัมน์</th>
+                        <th style="padding:6px 8px;text-align:center;font-size:0.78rem;color:var(--text-muted);">ว่าง (แถว)</th>
+                        <th style="padding:6px 8px;text-align:center;font-size:0.78rem;color:var(--text-muted);">%</th>
+                    </tr>
+                </thead>
+                <tbody>${missRows}</tbody>
+            </table>
+        </div>
+        ${dupHTML}`;
+
+    overlay.style.display = 'flex';
+    lucide.createIcons();
+}
+
+function closeDQModal() {
+    const overlay = document.getElementById('dq-modal-overlay');
+    if (overlay) overlay.style.display = 'none';
+}
+
+// ==========================================================================
+// 📲 PWA Install Prompt
+// ==========================================================================
+let _deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    _deferredInstallPrompt = e;
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner) { banner.style.display = 'flex'; lucide.createIcons(); }
+});
+
+function pwaInstall() {
+    if (!_deferredInstallPrompt) return;
+    _deferredInstallPrompt.prompt();
+    _deferredInstallPrompt.userChoice.then(() => {
+        _deferredInstallPrompt = null;
+        const banner = document.getElementById('pwa-install-banner');
+        if (banner) banner.style.display = 'none';
+    });
+}
+
+window.addEventListener('appinstalled', () => {
+    const banner = document.getElementById('pwa-install-banner');
+    if (banner) banner.style.display = 'none';
+    showToast('✅ ติดตั้งแอป MCHMUK สำเร็จ!', 'success', 4000);
+});

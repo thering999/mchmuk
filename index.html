@@ -7,7 +7,8 @@
     
     <!-- Custom Vanilla CSS Design System -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230284c7' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="style.css?v=1.6.4">
+    <link rel="stylesheet" href="style.css?v=1.6.5">
+    <link rel="manifest" href="manifest.json">
     
     <style>
         /* --- Specialized Custom Styles for HDC MOPH Mode --- */
@@ -263,8 +264,21 @@
                 <button class="btn btn-secondary" id="btn-load-local" style="display: none;">
                     <i data-lucide="database"></i> Load Local Dev File
                 </button>
+                <!-- Dark Mode Toggle -->
+                <button class="btn btn-secondary btn-icon" id="btn-dark-mode" onclick="toggleDarkMode()" title="สลับ Dark/Light Mode" style="padding:8px;">
+                    <i data-lucide="moon" id="dark-mode-icon" style="width:16px;height:16px;"></i>
+                </button>
             </div>
         </header>
+
+        <!-- PWA Install Banner -->
+        <div id="pwa-install-banner" style="display:none; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; background:linear-gradient(90deg,rgba(67,56,202,0.1),rgba(5,150,105,0.1)); border:1px solid rgba(67,56,202,0.2); border-radius:10px; font-size:0.85rem;">
+            <span><i data-lucide="download" style="width:15px;height:15px;vertical-align:middle;margin-right:6px;"></i> ติดตั้งแอปนี้บนอุปกรณ์ของคุณเพื่อเข้าถึงออฟไลน์ได้ทุกเมื่อ</span>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary" style="font-size:0.8rem;padding:6px 14px;" onclick="pwaInstall()">ติดตั้ง</button>
+                <button class="btn btn-secondary" style="font-size:0.8rem;padding:6px 10px;" onclick="document.getElementById('pwa-install-banner').style.display='none'">ไม่ใช่ตอนนี้</button>
+            </div>
+        </div>
 
         <!-- 📌 MOPH HDC Banner -->
         <div class="moph-alert-banner" id="moph-banner" style="display: none;">
@@ -684,6 +698,8 @@
                     <button class="filter-tab-btn" id="trend-tab-district" data-trend="district">รายอำเภอ</button>
                     <button class="filter-tab-btn" id="trend-tab-unit" data-trend="unit">รายหน่วยบริการ</button>
                     <button class="filter-tab-btn" id="trend-tab-fiscal" data-trend="fiscal">เปรียบเทียบปีงบ</button>
+                    <button class="filter-tab-btn" id="trend-tab-heatmap" data-trend="heatmap">Heatmap อำเภอ×เดือน</button>
+                    <button class="filter-tab-btn" id="trend-tab-ranking" data-trend="ranking">จัดอันดับ รพ.</button>
                 </div>
                 <div class="charts-grid">
                     <div class="chart-card col-8">
@@ -729,6 +745,8 @@
                         <button class="btn btn-secondary" id="btn-export-csv"><i data-lucide="download"></i> Export CSV</button>
                         <button class="btn btn-secondary" id="btn-export-json"><i data-lucide="code"></i> Export JSON</button>
                         <button class="btn btn-secondary" id="btn-print-report" onclick="printReport()"><i data-lucide="printer"></i> พิมพ์/PDF</button>
+                        <button class="btn btn-secondary" id="btn-data-quality" onclick="showDataQualityReport()" title="รายงานคุณภาพข้อมูล"><i data-lucide="shield-check"></i> คุณภาพข้อมูล</button>
+                        <button class="btn btn-secondary" id="btn-reset-filters" onclick="resetAllFilters()" title="รีเซ็ตทุก filter (Esc)"><i data-lucide="x-circle"></i> ล้าง Filter</button>
                     </div>
                 </div>
                 
@@ -780,6 +798,17 @@
     
     <!-- Main Application Javascript Logic -->
     <script src="app.js?v=1.6.3"></script>
+
+    <!-- Data Quality Modal -->
+    <div id="dq-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);z-index:400;backdrop-filter:blur(3px);" onclick="closeDQModal()">
+        <div id="dq-modal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--bg-card,white);border-radius:16px;padding:24px;width:min(600px,94vw);max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);" onclick="event.stopPropagation()">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="font-size:1rem;font-weight:700;display:flex;align-items:center;gap:8px;"><i data-lucide="shield-check" style="width:18px;height:18px;color:var(--neon-cyan,#0284c7);"></i> รายงานคุณภาพข้อมูล</h3>
+                <button onclick="closeDQModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted,#64748b);"><i data-lucide="x" style="width:20px;height:20px;"></i></button>
+            </div>
+            <div id="dq-content">กำลังวิเคราะห์...</div>
+        </div>
+    </div>
 
     <!-- Mobile Filter FAB + Bottom Sheet -->
     <button class="filter-fab" id="filter-fab" onclick="openFilterSheet()" title="กรองข้อมูล">

@@ -1,0 +1,20 @@
+{
+  "name": "MCHMUK HDC Analytics",
+  "short_name": "MCHMUK",
+  "description": "วิเคราะห์ข้อมูล HDC มุกดาหาร — ยาเสริมธาตุเหล็ก / โลหิตจาง",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef2ff",
+  "theme_color": "#4338ca",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192' fill='%234338ca'%3E%3Crect width='192' height='192' rx='36'/%3E%3Cpath fill='white' d='M96 32 L136 160 L96 128 L56 160Z'/%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["medical", "productivity"],
+  "lang": "th"
+}
