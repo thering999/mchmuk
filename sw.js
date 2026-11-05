@@ -1,4 +1,5 @@
-const CACHE_NAME = 'mchmuk-v1';
+// Bump this string on every deploy to invalidate old caches across all clients.
+const CACHE_NAME = 'mchmuk-v2-20261105';
 const STATIC_ASSETS = [
     './',
     './index.html',

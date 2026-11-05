@@ -438,6 +438,14 @@
         <div class="loading-overlay" id="loading-overlay">
             <div class="cyber-spinner"></div>
             <div class="loading-text">กำลังวิเคราะห์ข้อมูล...</div>
+            <!-- Skeleton pane (shown via skeleton-mode class) -->
+            <div class="skeleton-pane">
+                <div class="skeleton skeleton-kpi"></div>
+                <div class="skeleton skeleton-row"></div>
+                <div class="skeleton skeleton-row medium"></div>
+                <div class="skeleton skeleton-row short"></div>
+                <div class="skeleton skeleton-kpi"></div>
+            </div>
         </div>
 
         <!-- 💡 Welcome/Instruction Box when no data -->
@@ -462,6 +470,9 @@
                 </button>
                 <button class="filter-tab-btn" data-indicator="anemia-12m" style="font-size: 0.9rem; padding: 10px 18px;">
                     <i data-lucide="heart-pulse"></i> <span>โลหิตจาง อายุครบ 12 เดือน (A/B ≤<span id="anemia-tab-target">16</span>%)</span>
+                </button>
+                <button class="filter-tab-btn" data-indicator="wellchild" style="font-size: 0.9rem; padding: 10px 18px;">
+                    <i data-lucide="baby"></i> เด็กดี / WBC Screening
                 </button>
             </div>
 
@@ -608,6 +619,25 @@
                 </div>
             </section>
 
+            <!-- Coverage Alert Banner — hospitals below 75% target (MOPH mode only) -->
+            <div class="coverage-alert-panel" id="coverage-alert-panel">
+                <div class="alert-heading">
+                    <i data-lucide="alert-triangle" style="width:16px;height:16px;"></i>
+                    หน่วยบริการที่ยังไม่ถึงเป้าหมาย 75% (คลิกชื่อเพื่อกรองข้อมูล)
+                </div>
+                <div class="alert-chips" id="coverage-alert-chips"></div>
+            </div>
+
+            <!-- Composite Performance Score (MOPH mode only) -->
+            <div class="composite-score-card" id="composite-score-card">
+                <div class="composite-score-grade grade-a" id="composite-grade">A</div>
+                <div class="composite-score-details">
+                    <strong id="composite-label">คะแนนภาพรวม</strong>
+                    <span id="composite-breakdown">รอข้อมูล...</span>
+                    <span id="composite-hint" style="font-size:0.75rem;color:var(--text-muted);">Coverage, เจาะ HCT, โลหิตจาง</span>
+                </div>
+            </div>
+
             <!-- Interactive Visualizations Grid -->
             <section class="charts-grid">
                 <!-- Area Chart: Time-series / Progression -->
@@ -750,6 +780,39 @@
     
     <!-- Main Application Javascript Logic -->
     <script src="app.js?v=1.6.3"></script>
+
+    <!-- Mobile Filter FAB + Bottom Sheet -->
+    <button class="filter-fab" id="filter-fab" onclick="openFilterSheet()" title="กรองข้อมูล">
+        <i data-lucide="sliders-horizontal" style="width:22px;height:22px;"></i>
+    </button>
+    <div class="bottom-sheet-overlay" id="bottom-sheet-overlay" onclick="closeFilterSheet()"></div>
+    <div class="bottom-sheet" id="bottom-sheet">
+        <div class="bottom-sheet-handle"></div>
+        <div class="bottom-sheet-title"><i data-lucide="filter" style="width:16px;height:16px;vertical-align:middle;"></i> กรองข้อมูล</div>
+        <div class="bottom-sheet-section">
+            <label>ปีงบประมาณ</label>
+            <select id="bs-fy-select" class="form-select" style="width:100%;" onchange="document.getElementById('fiscal-year-select').value=this.value;document.getElementById('fiscal-year-select').dispatchEvent(new Event('change'))"></select>
+        </div>
+        <div class="bottom-sheet-section">
+            <label>ไตรมาส</label>
+            <select id="bs-q-select" class="form-select" style="width:100%;" onchange="document.getElementById('quarter-select').value=this.value;document.getElementById('quarter-select').dispatchEvent(new Event('change'))">
+                <option value="all">ทั้งปี</option>
+                <option value="1">Q1 (ต.ค.–ธ.ค.)</option>
+                <option value="2">Q2 (ม.ค.–มี.ค.)</option>
+                <option value="3">Q3 (เม.ย.–มิ.ย.)</option>
+                <option value="4">Q4 (ก.ค.–ก.ย.)</option>
+            </select>
+        </div>
+        <div class="bottom-sheet-section">
+            <label>อำเภอ</label>
+            <select id="bs-dist-select" class="form-select" style="width:100%;" onchange="document.getElementById('select-district').value=this.value;document.getElementById('select-district').dispatchEvent(new Event('change'))"></select>
+        </div>
+        <div class="bottom-sheet-section">
+            <label>หน่วยบริการ</label>
+            <select id="bs-hosp-select" class="form-select" style="width:100%;" onchange="document.getElementById('select-hospital').value=this.value;document.getElementById('select-hospital').dispatchEvent(new Event('change'))"></select>
+        </div>
+        <button class="btn btn-primary" style="width:100%;margin-top:8px;" onclick="closeFilterSheet()">ปิด</button>
+    </div>
 
     <!-- Service Worker registration — offline cache + faster repeat loads -->
     <script>

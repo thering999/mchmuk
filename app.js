@@ -572,6 +572,17 @@ function initMophIndicatorTabs() {
                 // Update banner
                 document.querySelector('#moph-banner .moph-alert-title p').textContent =
                     'ร้อยละของเด็กอายุ 6 เดือน – 5 ปี ได้รับยาน้ำเสริมธาตุเหล็ก (เป้าหมาย: ร้อยละ 75.0 ขึ้นไป)';
+            } else if (appState.activeMophIndicator === 'wellchild') {
+                if (ageFilters) ageFilters.style.display = 'none';
+                if (hctFilters) hctFilters.style.display = 'none';
+                updatePeriodControls();
+                const disclaimer = document.getElementById('moph-anemia-disclaimer');
+                if (disclaimer) {
+                    disclaimer.style.display = 'block';
+                    disclaimer.innerHTML = '<strong style="color:var(--text-secondary);">ℹ️ เด็กดี / WBC Screening:</strong> ใช้คอลัมน์ <code>wbc_result</code> หรือ <code>wellchild_visit</code> ในไฟล์ข้อมูล หากไม่มีคอลัมน์ดังกล่าวระบบจะแสดงจำนวนรายการทั้งหมดแทน';
+                }
+                document.querySelector('#moph-banner .moph-alert-title p').textContent =
+                    'เด็กดี / WBC Screening — ต้องมีคอลัมน์ wbc_result หรือ wellchild_visit ในไฟล์';
             } else {
                 if (ageFilters) ageFilters.style.display = 'none';
                 if (hctFilters) hctFilters.style.display = 'none';
@@ -802,12 +813,18 @@ function showToast(message, type = 'info', duration = 4000) {
 // 📁 File Processing & SheetJS Integration
 // ==========================================================================
 
-function toggleLoader(active, text = "กำลังวิเคราะห์ข้อมูล...") {
+function toggleLoader(active, text = "กำลังวิเคราะห์ข้อมูล...", skeleton = false) {
     const loader = document.getElementById('loading-overlay');
     if (loader) {
         document.querySelector('#loading-overlay .loading-text').textContent = text;
-        if (active) loader.classList.add('active');
-        else loader.classList.remove('active');
+        if (active) {
+            loader.classList.add('active');
+            if (skeleton) loader.classList.add('skeleton-mode');
+            else loader.classList.remove('skeleton-mode');
+        } else {
+            loader.classList.remove('active');
+            loader.classList.remove('skeleton-mode');
+        }
     }
 }
 
@@ -896,7 +913,7 @@ function processFile(file) {
 
 // Load and parse data from selected sheet
 async function loadSheetData(sheetName) {
-    toggleLoader(true, `กำลังอ่านข้อมูลแผ่นงาน [${sheetName}]...`);
+    toggleLoader(true, `กำลังอ่านข้อมูลแผ่นงาน [${sheetName}]...`, true);
     appState.currentSheetName = sheetName;
 
     let jsonData, jsonDataText;
@@ -1812,6 +1829,36 @@ function renderKPIs() {
             document.getElementById('kpi-unique-categories').textContent = totalAnemia.toLocaleString();
             document.getElementById('kpi-4-subtitle').innerHTML = `<i data-lucide="heart-pulse"></i> ปกติ (Normal) ${totalNormal} ราย`;
 
+        } else if (appState.activeMophIndicator === 'wellchild') {
+            // --- Well-child / WBC Screening indicator ---
+            const wbcCol = appState.headers.find(h => /wbc_result|wellchild_visit|well.child/i.test(h));
+            const visitCol = appState.headers.find(h => /visit|attended/i.test(h));
+            const total = rows.length;
+
+            const attended = wbcCol
+                ? rows.filter(r => { const v = String(r[wbcCol] || '').toLowerCase(); return v === '1' || v === 'yes' || v === 'ผ่าน' || v === 'done'; }).length
+                : (visitCol ? rows.filter(r => cleanNumericValue(r[visitCol]) >= 1).length : 0);
+            const attendRate = total > 0 ? (attended / total * 100).toFixed(1) : '–';
+
+            document.getElementById('kpi-1-title').textContent = 'เด็กกลุ่มเป้าหมายทั้งหมด';
+            document.getElementById('kpi-total-rows').textContent = total.toLocaleString();
+            document.getElementById('kpi-1-subtitle').innerHTML = '<i data-lucide="baby"></i> เด็กดี / WBC Screening';
+            document.getElementById('kpi-sum-title').textContent = 'มารับบริการ / ผ่านเกณฑ์';
+            document.getElementById('kpi-total-sum').textContent = attended.toLocaleString();
+            document.getElementById('kpi-sum-subtitle').innerHTML = wbcCol ? `<i data-lucide="check-circle-2"></i> จากคอลัมน์ ${wbcCol}` : '<i data-lucide="info"></i> ไม่พบคอลัมน์ wbc_result';
+            document.getElementById('kpi-avg-title').textContent = 'ร้อยละครอบคลุม (Coverage%)';
+            document.getElementById('kpi-total-avg').textContent = attendRate + (attendRate !== '–' ? '%' : '');
+            document.getElementById('kpi-avg-subtitle').className = `kpi-trend ${wbcCol ? 'positive' : 'neutral'}`;
+            document.getElementById('kpi-avg-subtitle').innerHTML = wbcCol ? '<i data-lucide="trending-up"></i> คำนวณจากข้อมูลจริง' : '<i data-lucide="alert-triangle"></i> ต้องการคอลัมน์ wbc_result';
+            document.getElementById('kpi-4-title').textContent = 'จำนวนคอลัมน์ในข้อมูล';
+            document.getElementById('kpi-unique-categories').textContent = appState.headers.length;
+            document.getElementById('kpi-4-subtitle').innerHTML = `<i data-lucide="table-2"></i> ${appState.headers.slice(0,3).join(', ')}...`;
+            const targetBadge = document.getElementById('moph-target-badge');
+            if (targetBadge) {
+                targetBadge.className = wbcCol ? 'target-badge met' : 'target-badge';
+                targetBadge.textContent = wbcCol ? `คอลัมน์: ${wbcCol}` : 'ต้องการ wbc_result';
+            }
+
         } else {
             // --- MOPH Specialized HDC Analytics: ยาเสริมธาตุเหล็ก ---
             const totalTarget = rows.length;
@@ -1905,10 +1952,148 @@ function renderKPIs() {
     lucide.createIcons();
 }
 
+// ==========================================================================
+// 🚨 Coverage Alert Banner — list hospitals below 75% target
+// ==========================================================================
+function renderCoverageAlerts() {
+    const panel = document.getElementById('coverage-alert-panel');
+    const chips = document.getElementById('coverage-alert-chips');
+    if (!panel || !chips || !appState.isMophMode || appState.activeMophIndicator !== 'iron-supplement') {
+        if (panel) panel.classList.remove('has-alerts');
+        return;
+    }
+
+    const { hosnameCol } = trendGetCols();
+    if (!hosnameCol) { panel.classList.remove('has-alerts'); return; }
+
+    const rows = appState.filteredData;
+    const hospMap = {};
+    rows.forEach(r => {
+        const h = String(r[hosnameCol] || '');
+        if (!h) return;
+        if (!hospMap[h]) hospMap[h] = { total: 0, received: 0 };
+        hospMap[h].total++;
+        if (isReceivedValue(r['result'])) hospMap[h].received++;
+    });
+
+    const belowTarget = Object.entries(hospMap)
+        .filter(([, b]) => b.total >= 5 && (b.received / b.total * 100) < 75)
+        .sort((a, b) => (a[1].received / a[1].total) - (b[1].received / b[1].total));
+
+    chips.innerHTML = '';
+    if (belowTarget.length === 0) { panel.classList.remove('has-alerts'); return; }
+
+    belowTarget.forEach(([name, b]) => {
+        const pct = (b.received / b.total * 100).toFixed(1);
+        const chip = document.createElement('span');
+        chip.className = 'coverage-alert-chip';
+        chip.textContent = `${name} (${pct}%)`;
+        chip.title = `คลิกเพื่อกรอง: ${name}`;
+        chip.addEventListener('click', () => {
+            appState.activeHospitalFilter = name;
+            const hospEl = document.getElementById('select-hospital');
+            if (hospEl) hospEl.value = name;
+            applyAllFilters();
+        });
+        chips.appendChild(chip);
+    });
+    panel.classList.add('has-alerts');
+    lucide.createIcons();
+}
+
+// ==========================================================================
+// 🏆 Composite Performance Score
+// ==========================================================================
+function renderCompositeScore() {
+    const card = document.getElementById('composite-score-card');
+    const gradeEl = document.getElementById('composite-grade');
+    const labelEl = document.getElementById('composite-label');
+    const breakdownEl = document.getElementById('composite-breakdown');
+    if (!card || !appState.isMophMode || appState.activeMophIndicator !== 'iron-supplement') {
+        if (card) card.classList.remove('visible');
+        return;
+    }
+
+    const rows = appState.filteredData;
+    if (rows.length === 0) { card.classList.remove('visible'); return; }
+
+    const totalReceived = rows.filter(r => isReceivedValue(r['result'])).length;
+    const totalTested = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1).length;
+    const totalAnemia = rows.filter(r => cleanNumericValue(r['lab_result_status']) === 1 && isAnemicRow(r)).length;
+
+    const coverage = rows.length > 0 ? totalReceived / rows.length * 100 : 0;
+    const hctRate = rows.length > 0 ? totalTested / rows.length * 100 : 0;
+    const anemiaRate = totalTested > 0 ? totalAnemia / totalTested * 100 : 0;
+    const anemiaTarget = ANEMIA_TARGET_BY_FY[appState.fiscalYear] || 16;
+
+    // Score: coverage (weight 50%), HCT rate (weight 25%), anemia (weight 25% inverted)
+    const covScore = Math.min(coverage / 75 * 50, 50);
+    const hctScore = Math.min(hctRate / 50 * 25, 25);
+    const anemiaScore = anemiaRate <= anemiaTarget ? 25 : Math.max(0, 25 - (anemiaRate - anemiaTarget) * 2);
+    const total = Math.round(covScore + hctScore + anemiaScore);
+
+    let grade, gradeClass;
+    if (total >= 90) { grade = 'A'; gradeClass = 'grade-a'; }
+    else if (total >= 75) { grade = 'B'; gradeClass = 'grade-b'; }
+    else if (total >= 55) { grade = 'C'; gradeClass = 'grade-c'; }
+    else { grade = 'D'; gradeClass = 'grade-d'; }
+
+    gradeEl.textContent = grade;
+    gradeEl.className = `composite-score-grade ${gradeClass}`;
+    labelEl.textContent = `คะแนนภาพรวม ${total}/100`;
+    breakdownEl.textContent = `Coverage ${coverage.toFixed(1)}% · HCT ${hctRate.toFixed(1)}% · โลหิตจาง ${anemiaRate.toFixed(1)}%`;
+    card.classList.add('visible');
+}
+
+// ==========================================================================
+// 📱 Mobile Bottom Sheet Filter
+// ==========================================================================
+function openFilterSheet() {
+    document.getElementById('bottom-sheet-overlay').classList.add('open');
+    document.getElementById('bottom-sheet').classList.add('open');
+    syncBottomSheetSelects();
+}
+
+function closeFilterSheet() {
+    document.getElementById('bottom-sheet-overlay').classList.remove('open');
+    document.getElementById('bottom-sheet').classList.remove('open');
+}
+
+function syncBottomSheetSelects() {
+    // Sync FY options
+    const fyMain = document.getElementById('fiscal-year-select');
+    const fyBS = document.getElementById('bs-fy-select');
+    if (fyMain && fyBS) {
+        fyBS.innerHTML = fyMain.innerHTML;
+        fyBS.value = fyMain.value;
+    }
+    // Sync district
+    const distMain = document.getElementById('select-district');
+    const distBS = document.getElementById('bs-dist-select');
+    if (distMain && distBS) {
+        distBS.innerHTML = distMain.innerHTML;
+        distBS.value = distMain.value;
+    }
+    // Sync hospital
+    const hospMain = document.getElementById('select-hospital');
+    const hospBS = document.getElementById('bs-hosp-select');
+    if (hospMain && hospBS) {
+        hospBS.innerHTML = hospMain.innerHTML;
+        hospBS.value = hospMain.value;
+    }
+    // Sync quarter
+    const qBS = document.getElementById('bs-q-select');
+    const qMain = document.getElementById('quarter-select');
+    if (qBS && qMain) qBS.value = qMain.value;
+}
+
 function triggerAnalyticsUpdate() {
     renderKPIs();
+    renderCoverageAlerts();
+    renderCompositeScore();
     renderCharts();
     renderTable();
+    syncBottomSheetSelects();
 }
 
 // ==========================================================================
@@ -2931,14 +3116,30 @@ function renderTrendDistrict(rows) {
     });
 
     const mainOpts = {
-        chart: { type: 'bar', height: Math.max(300, dLabels.length * 28 + 60), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false } },
+        chart: {
+            type: 'bar', height: Math.max(300, dLabels.length * 28 + 60), background: 'transparent', foreColor: '#64748b', toolbar: { show: false }, animations: { enabled: false },
+            events: {
+                dataPointSelection: (event, chartCtx, config) => {
+                    const dist = dLabels[config.dataPointIndex];
+                    if (!dist) return;
+                    appState.activeDistrictFilter = dist;
+                    const distEl = document.getElementById('select-district');
+                    if (distEl) distEl.value = dist;
+                    appState.activeHospitalFilter = 'all';
+                    const hospEl = document.getElementById('select-hospital');
+                    if (hospEl) hospEl.value = 'all';
+                    applyAllFilters();
+                    showToast(`📍 กรองข้อมูลอำเภอ: ${dist}`, 'info', 3000);
+                }
+            }
+        },
         series: [{ name: isAnemia ? 'ร้อยละโลหิตจาง' : 'ความครอบคลุม%', data: dVals }],
         xaxis: { categories: dLabels, labels: { style: { fontSize: '11px' } } },
         yaxis: { min: 0, max: 100, labels: { formatter: v => v + '%' } },
         colors: [TREND_COLORS[0]],
         plotOptions: { bar: { horizontal: true, borderRadius: 3, dataLabels: { position: 'top' } } },
         dataLabels: { enabled: true, formatter: v => v + '%', offsetX: 5, style: { fontSize: '10px', colors: ['#64748b'] } },
-        tooltip: { y: { formatter: v => v + '%' } },
+        tooltip: { y: { formatter: v => v + '%' }, custom: ({ seriesIndex, dataPointIndex }) => `<div style="padding:6px 10px;font-size:12px;"><b>${dLabels[dataPointIndex]}</b><br/>${dVals[dataPointIndex]}% — คลิกเพื่อกรอง</div>` },
         grid: { borderColor: 'rgba(100,116,139,0.15)' }
     };
     renderTrendMain(document.getElementById('trend-chart-main'), mainOpts);
@@ -3651,6 +3852,8 @@ async function loadLocalExcelFile(isSilent = false) {
 
         const buffer = await response.arrayBuffer();
         appState._xlsxBuffer = buffer;
+        // Persist to IDB for offline use (non-blocking, best-effort)
+        saveActiveDataset(buffer).catch(() => {});
 
         // Parse via Worker — non-blocking
         const workerResult = await parseExcelWithWorker(buffer.slice(0), null);
@@ -3743,6 +3946,28 @@ async function loadLocalExcelFile(isSilent = false) {
 
     } catch (err) {
         console.warn("Server fetch failed:", err.message);
+        // Try IDB fallback for offline mode
+        try {
+            const cached = await getActiveDataset();
+            if (cached && cached.buffer) {
+                console.log('IDB: loading cached dataset (offline mode)');
+                appState._xlsxBuffer = cached.buffer;
+                const workerResult = await parseExcelWithWorker(cached.buffer.slice(0), null);
+                const sheetNames = workerResult.sheetNames;
+                appState.sheetNames = sheetNames;
+                const sheetSelect = document.getElementById('select-sheet');
+                sheetSelect.innerHTML = '';
+                sheetNames.forEach(sn => { const o = document.createElement('option'); o.value = sn; o.textContent = sn; sheetSelect.appendChild(o); });
+                sheetSelect.value = workerResult.targetSheet;
+                if (location.hash) { restoreStateFromHash(); syncUIControlsFromState(); }
+                await loadSheetData(workerResult.targetSheet);
+                document.getElementById('val-status').textContent = "ออฟไลน์ (แคช)";
+                document.getElementById('val-status').className = "status-badge pending";
+                toggleLoader(false);
+                showToast('📱 โหมดออฟไลน์ — แสดงข้อมูลที่แคชไว้ล่าสุด', 'warn', 5000);
+                return;
+            }
+        } catch (idbErr) { console.warn('IDB fallback failed:', idbErr.message); }
         toggleLoader(false);
         if (!isSilent) {
             showToast(`⚠️ ไม่สามารถดึงข้อมูลจาก Server: ${err.message}`, 'warn', 6000);
@@ -3959,8 +4184,56 @@ function clearAdminPAT() {
     console.log('✅ Custom GitHub PAT cleared. Reverting to default.');
 }
 
-// Stub functions (ไม่ใช้ IndexedDB แล้ว)
 function refreshBatchList() {}
 function loadLatestActiveBatch() {}
-async function saveActiveDataset() { return { ok: true }; }
-async function getActiveDataset() { return null; }
+
+// ==========================================================================
+// 💾 IndexedDB — offline data persistence
+//    Stores the raw XLSX ArrayBuffer so the dashboard works offline after
+//    the first online load. Key: 'mchmuk-xlsx-buffer'
+// ==========================================================================
+const IDB_NAME = 'mchmuk-offline';
+const IDB_STORE = 'datasets';
+const IDB_KEY = 'mchmuk-xlsx-buffer';
+
+function openIDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = e => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = e => reject(e.target.error);
+    });
+}
+
+async function saveActiveDataset(buffer) {
+    try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readwrite');
+            tx.objectStore(IDB_STORE).put({ buffer, savedAt: Date.now() }, IDB_KEY);
+            tx.oncomplete = () => { db.close(); resolve({ ok: true }); };
+            tx.onerror = e => { db.close(); reject(e.target.error); };
+        });
+    } catch (err) {
+        console.warn('IDB save failed:', err.message);
+        return { ok: false };
+    }
+}
+
+async function getActiveDataset() {
+    try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_STORE, 'readonly');
+            const req = tx.objectStore(IDB_STORE).get(IDB_KEY);
+            req.onsuccess = e => { db.close(); resolve(e.target.result || null); };
+            req.onerror = e => { db.close(); reject(e.target.error); };
+        });
+    } catch (err) {
+        console.warn('IDB load failed:', err.message);
+        return null;
+    }
+}

@@ -1357,3 +1357,251 @@ footer a:hover {
     }
 }
 
+/* ==========================================================================
+   Skeleton Loader
+   ========================================================================== */
+@keyframes shimmer {
+    0%   { background-position: -800px 0; }
+    100% { background-position: 800px 0; }
+}
+.skeleton {
+    background: linear-gradient(90deg, rgba(226,232,240,0.6) 25%, rgba(248,250,252,0.9) 50%, rgba(226,232,240,0.6) 75%);
+    background-size: 800px 100%;
+    animation: shimmer 1.4s infinite linear;
+    border-radius: 6px;
+}
+.skeleton-kpi {
+    height: 80px;
+    border-radius: var(--border-radius-md);
+    margin-bottom: 10px;
+}
+.skeleton-row {
+    height: 18px;
+    margin-bottom: 8px;
+}
+.skeleton-row.short { width: 55%; }
+.skeleton-row.medium { width: 75%; }
+.loading-overlay .skeleton-pane {
+    display: none;
+    flex-direction: column;
+    gap: 16px;
+    width: 300px;
+    max-width: 90vw;
+}
+.loading-overlay.skeleton-mode .cyber-spinner { display: none; }
+.loading-overlay.skeleton-mode .loading-text { display: none; }
+.loading-overlay.skeleton-mode .skeleton-pane { display: flex; }
+
+/* ==========================================================================
+   Coverage Alert Banner — hospitals below 75% target
+   ========================================================================== */
+.coverage-alert-panel {
+    background: rgba(220,38,38,0.05);
+    border: 1px solid rgba(220,38,38,0.25);
+    border-left: 4px solid var(--neon-pink);
+    border-radius: var(--border-radius-md);
+    padding: 12px 16px;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+}
+.coverage-alert-panel.has-alerts { display: flex; }
+.coverage-alert-panel .alert-heading {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--neon-pink);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.coverage-alert-panel .alert-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.coverage-alert-chip {
+    background: rgba(220,38,38,0.08);
+    border: 1px solid rgba(220,38,38,0.2);
+    color: #b91c1c;
+    font-size: 0.75rem;
+    padding: 3px 10px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.coverage-alert-chip:hover {
+    background: rgba(220,38,38,0.15);
+}
+
+/* ==========================================================================
+   Composite Score KPI
+   ========================================================================== */
+.composite-score-card {
+    background: linear-gradient(135deg, rgba(67,56,202,0.08), rgba(5,150,105,0.08));
+    border: 1px solid rgba(67,56,202,0.2);
+    border-radius: var(--border-radius-md);
+    padding: 14px 18px;
+    display: none;
+    align-items: center;
+    gap: 16px;
+}
+.composite-score-card.visible { display: flex; }
+.composite-score-grade {
+    font-size: 2.4rem;
+    font-weight: 900;
+    font-family: var(--font-display);
+    min-width: 48px;
+    text-align: center;
+    line-height: 1;
+}
+.composite-score-grade.grade-a { color: #15803d; }
+.composite-score-grade.grade-b { color: #0284c7; }
+.composite-score-grade.grade-c { color: #d97706; }
+.composite-score-grade.grade-d { color: #dc2626; }
+.composite-score-details {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+.composite-score-details strong {
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Mobile Bottom Sheet Filter
+   ========================================================================== */
+.filter-fab {
+    display: none;
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 200;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--neon-cyan);
+    color: white;
+    border: none;
+    cursor: pointer;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(2,132,199,0.4);
+    transition: transform 0.2s;
+}
+.filter-fab:active { transform: scale(0.93); }
+
+.bottom-sheet-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(15,23,42,0.5);
+    z-index: 300;
+    backdrop-filter: blur(2px);
+}
+.bottom-sheet-overlay.open { display: block; }
+
+.bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: white;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px 32px;
+    z-index: 301;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    max-height: 80vh;
+    overflow-y: auto;
+}
+.bottom-sheet.open { transform: translateY(0); }
+.bottom-sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: #cbd5e1;
+    border-radius: 2px;
+    margin: 0 auto 16px;
+}
+.bottom-sheet-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 16px;
+    color: var(--text-primary);
+}
+.bottom-sheet-section {
+    margin-bottom: 16px;
+}
+.bottom-sheet-section label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+@media (max-width: 640px) {
+    .filter-fab { display: flex; }
+}
+
+/* ==========================================================================
+   @media print — print/PDF-friendly view
+   ========================================================================== */
+@media print {
+    @page { margin: 15mm 12mm; }
+
+    body {
+        background: white !important;
+        background-image: none !important;
+        color: #0f172a !important;
+    }
+    body::before, body::after { display: none !important; }
+
+    header .btn,
+    .upload-section,
+    #moph-cohort-controls,
+    #moph-age-filters,
+    #moph-hct-filters,
+    #moph-hospital-filter,
+    .filter-tabs,
+    .table-toolbar,
+    #auth-panel,
+    .filter-fab,
+    .bottom-sheet-overlay,
+    .loading-overlay,
+    #btn-print-report,
+    .btn-logout {
+        display: none !important;
+    }
+
+    .kpi-card, .chart-card, .table-card, .metrics-grid {
+        break-inside: avoid;
+        box-shadow: none !important;
+        border: 1px solid #cbd5e1 !important;
+        background: white !important;
+        backdrop-filter: none !important;
+    }
+
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .kpi-value {
+        color: #0f172a !important;
+        text-shadow: none !important;
+    }
+
+    .coverage-alert-panel {
+        border: 1px solid #fca5a5 !important;
+        background: #fff !important;
+    }
+
+    .composite-score-grade { text-shadow: none !important; }
+
+    .trend-charts-grid { grid-template-columns: 1fr !important; }
+}
