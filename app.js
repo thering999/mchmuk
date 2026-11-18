@@ -149,9 +149,10 @@ function parseDateValue(val) {
     if (!isNaN(num) && num > 10000 && num < 100000) {
         return new Date((num - 25569) * 86400 * 1000);
     }
-    const thMatch = strVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    const thMatch = strVal.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
     if (thMatch) {
         let [, d, m, y] = thMatch.map(Number);
+        if (y < 100) y += (y < 70 ? 2000 : 1900);  // 2-digit: 00-69→2000s, 70-99→1900s
         if (y >= 2500) y -= 543;
         return new Date(y, m - 1, d);
     }
@@ -1030,6 +1031,25 @@ async function loadSheetData(sheetName) {
         }
     });
 
+    // Save rows per FY to IDB, then merge older FYs into jsonData before assigning
+    try {
+        const byFY = {};
+        jsonData.forEach(row => {
+            const d = parseDateValue(row['epi_date']);
+            const fy = d ? fiscalYearOf(d) : null;
+            if (fy) { if (!byFY[fy]) byFY[fy] = []; byFY[fy].push(row); }
+        });
+        const currentFYs = Object.keys(byFY).map(Number);
+        await Promise.all(currentFYs.map(fy => saveFYRows(fy, byFY[fy])));
+        const oldRows = await loadStoredFYRows(currentFYs);
+        if (oldRows.length) {
+            const offset = jsonData.length;
+            oldRows.forEach((row, i) => { row.__rowIdx__ = offset + i; });
+            jsonData = jsonData.concat(oldRows);
+            console.log(`[FY store] merged ${oldRows.length} rows from previous FY(s)`);
+        }
+    } catch (e) { console.warn('[FY store] error:', e.message); }
+
     appState.rawData = jsonData;
 
     // Collect unique keys/headers (exclude internal __rowIdx__)
@@ -1130,14 +1150,29 @@ function renderFyBadge() {
                 const style = isCurrent
                     ? `background:var(--neon-cyan);color:#fff;box-shadow:0 0 10px var(--neon-cyan-glow);`
                     : `background:rgba(2,132,199,0.1);color:var(--neon-cyan);`;
+                const delBtn = !isCurrent
+                    ? `<button onclick="removeCachedFY(${fy})" title="ลบข้อมูลปีงบ ${fy} ออกจาก cache" style="background:none;border:none;cursor:pointer;color:inherit;opacity:0.6;padding:0 0 0 4px;font-size:0.75rem;" aria-label="ลบปีงบ ${fy}">✕</button>`
+                    : '';
                 return `<span style="${style}padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:700;letter-spacing:0.5px;margin-left:4px;">
-                    ปีงบ ${fy} <span style="opacity:0.85;">(${count.toLocaleString()} ราย)</span>${isCurrent ? ' ✓' : ''}
+                    ปีงบ ${fy} <span style="opacity:0.85;">(${count.toLocaleString()} ราย)</span>${isCurrent ? ' ✓' : ''}${delBtn}
                 </span>`;
             }).join('');
         } else {
             fyRow.style.display = 'none';
         }
     }
+}
+
+async function removeCachedFY(fy) {
+    await deleteFYRows(fy);
+    // Remove rows of this FY from rawData in memory
+    appState.rawData = appState.rawData.filter(row => {
+        const d = parseDateValue(row['epi_date']);
+        return !d || fiscalYearOf(d) !== fy;
+    });
+    renderFyBadge();
+    applyAllFilters();
+    showToast(`🗑 ลบข้อมูลปีงบ ${fy} ออกจาก cache แล้ว`, 'warn', 3000);
 }
 
 // Dynamic type checker
@@ -1538,11 +1573,15 @@ function applyAllFilters() {
                     });
                 }
             } else {
-                if (appState.headers.includes('epi_date')) {
+                const hasEpiDate = appState.headers.includes('epi_date');
+                const hasLabDate = appState.headers.includes('lab_date');
+                if (hasEpiDate || hasLabDate) {
                     const fy = appState.fiscalYear;
                     const q = appState.activeQuarter;
                     filtered = filtered.filter(row => {
-                        const d = parseDateValue(row['epi_date']);
+                        // prefer epi_date; fall back to lab_date
+                        const d = (hasEpiDate ? parseDateValue(row['epi_date']) : null)
+                               || (hasLabDate ? parseDateValue(row['lab_date']) : null);
                         if (!d || fiscalYearOf(d) !== fy) return false;
                         return q === 'all' || fiscalQuarterOf(d) === Number(q);
                     });
@@ -4237,14 +4276,16 @@ function loadLatestActiveBatch() {}
 // ==========================================================================
 const IDB_NAME = 'mchmuk-offline';
 const IDB_STORE = 'datasets';
+const IDB_FY_STORE = 'fy-rows';
 const IDB_KEY = 'mchmuk-xlsx-buffer';
 
 function openIDB() {
     return new Promise((resolve, reject) => {
-        const req = indexedDB.open(IDB_NAME, 1);
+        const req = indexedDB.open(IDB_NAME, 2);
         req.onupgradeneeded = e => {
             const db = e.target.result;
             if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+            if (!db.objectStoreNames.contains(IDB_FY_STORE)) db.createObjectStore(IDB_FY_STORE);
         };
         req.onsuccess = e => resolve(e.target.result);
         req.onerror = e => reject(e.target.error);
@@ -4279,6 +4320,82 @@ async function getActiveDataset() {
         console.warn('IDB load failed:', err.message);
         return null;
     }
+}
+
+// Save rows for a specific FY to IDB (overwrites previous data for that FY)
+async function saveFYRows(fy, rows) {
+    try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_FY_STORE, 'readwrite');
+            tx.objectStore(IDB_FY_STORE).put({ rows, savedAt: Date.now() }, String(fy));
+            tx.oncomplete = () => { db.close(); resolve({ ok: true }); };
+            tx.onerror = e => { db.close(); reject(e.target.error); };
+        });
+    } catch (err) {
+        console.warn('IDB FY save failed:', err.message);
+        return { ok: false };
+    }
+}
+
+// Load rows for all stored FYs EXCEPT the ones already in currentFYs
+async function loadStoredFYRows(currentFYs = []) {
+    try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_FY_STORE, 'readonly');
+            const req = tx.objectStore(IDB_FY_STORE).getAllKeys();
+            req.onsuccess = async e => {
+                const keys = e.target.result.filter(k => !currentFYs.includes(Number(k)));
+                if (!keys.length) { db.close(); return resolve([]); }
+                let merged = [];
+                let pending = keys.length;
+                keys.forEach(k => {
+                    const r = tx.objectStore(IDB_FY_STORE).get(k);
+                    r.onsuccess = ev => {
+                        if (ev.target.result?.rows) merged = merged.concat(ev.target.result.rows);
+                        if (--pending === 0) { db.close(); resolve(merged); }
+                    };
+                    r.onerror = () => { if (--pending === 0) { db.close(); resolve(merged); } };
+                });
+            };
+            req.onerror = e => { db.close(); reject(e.target.error); };
+        });
+    } catch (err) {
+        console.warn('IDB FY load failed:', err.message);
+        return [];
+    }
+}
+
+// Return list of all stored FYs with row counts
+async function getStoredFYList() {
+    try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_FY_STORE, 'readonly');
+            const req = tx.objectStore(IDB_FY_STORE).getAll();
+            req.onsuccess = e => {
+                const keyReq = tx.objectStore(IDB_FY_STORE).getAllKeys();
+                keyReq.onsuccess = ke => {
+                    const list = ke.target.result.map((k, i) => ({ fy: Number(k), count: (e.target.result[i]?.rows?.length || 0), savedAt: e.target.result[i]?.savedAt }));
+                    db.close(); resolve(list.sort((a, b) => a.fy - b.fy));
+                };
+            };
+            req.onerror = e => { db.close(); reject(e.target.error); };
+        });
+    } catch (err) { return []; }
+}
+
+async function deleteFYRows(fy) {
+    try {
+        const db = await openIDB();
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction(IDB_FY_STORE, 'readwrite');
+            tx.objectStore(IDB_FY_STORE).delete(String(fy));
+            tx.oncomplete = () => { db.close(); resolve({ ok: true }); };
+            tx.onerror = e => { db.close(); reject(e.target.error); };
+        });
+    } catch (err) { return { ok: false }; }
 }
 
 // ==========================================================================
