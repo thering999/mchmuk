@@ -120,7 +120,7 @@ function restoreStateFromHash() {
     if (p.get('district')) appState.activeDistrictFilter = p.get('district');
     if (p.get('hospital')) appState.activeHospitalFilter = p.get('hospital');
     const ind = p.get('indicator');
-    if (ind && (ind !== 'wellchild' || hasWellchildData())) appState.activeMophIndicator = ind;
+    if (ind) appState.activeMophIndicator = ind;
 }
 
 function syncUIControlsFromState() {
@@ -170,10 +170,12 @@ const fiscalYearOf = (date) => date.getFullYear() + 543 + (date.getMonth() >= 9 
 const fiscalQuarterOf = (date) => Math.floor(((date.getMonth() + 3) % 12) / 3) + 1;
 
 function getServiceFiscalYears() {
-    if (!appState.headers.includes('epi_date')) return [];
+    const hasEpi = appState.headers.includes('epi_date');
+    const hasLab = appState.headers.includes('lab_date');
+    if (!hasEpi && !hasLab) return [];
     const counts = {};
     appState.rawData.forEach(row => {
-        const d = parseDateValue(row['epi_date']);
+        const d = (hasEpi ? parseDateValue(row['epi_date']) : null) || (hasLab ? parseDateValue(row['lab_date']) : null);
         if (d) { const fy = fiscalYearOf(d); counts[fy] = (counts[fy] || 0) + 1; }
     });
     return Object.keys(counts).map(Number).sort((a, b) => a - b).map(fy => ({ fy, count: counts[fy] }));
@@ -1035,7 +1037,7 @@ async function loadSheetData(sheetName) {
     try {
         const byFY = {};
         jsonData.forEach(row => {
-            const d = parseDateValue(row['epi_date']);
+            const d = parseDateValue(row['epi_date']) || parseDateValue(row['lab_date']);
             const fy = d ? fiscalYearOf(d) : null;
             if (fy) { if (!byFY[fy]) byFY[fy] = []; byFY[fy].push(row); }
         });
@@ -1048,11 +1050,11 @@ async function loadSheetData(sheetName) {
             jsonData = jsonData.concat(oldRows);
             // Extend rawDataText so export covers historical FY rows too
             jsonDataText = (jsonDataText || []).concat(oldRows.map(r => ({ ...r })));
-            console.log(`[FY store] merged ${oldRows.length} rows from previous FY(s)`);
         }
     } catch (e) { console.warn('[FY store] error:', e.message); }
 
     appState.rawData = jsonData;
+    appState.rawDataText = jsonDataText;
 
     // Collect unique keys/headers (exclude internal __rowIdx__)
     const headerSet = new Set();
@@ -1168,13 +1170,14 @@ function renderFyBadge() {
 async function removeCachedFY(fy) {
     if (!confirm(`ลบข้อมูลปีงบ ${fy} ออกจาก cache?\n(สามารถโหลดคืนได้โดยอัปโหลดไฟล์ใหม่)`)) return;
     await deleteFYRows(fy);
+    const dateOf = row => parseDateValue(row['epi_date']) || parseDateValue(row['lab_date']);
     appState.rawData = appState.rawData.filter(row => {
-        const d = parseDateValue(row['epi_date']);
+        const d = dateOf(row);
         return !d || fiscalYearOf(d) !== fy;
     });
     if (Array.isArray(appState.rawDataText)) {
         appState.rawDataText = appState.rawDataText.filter(row => {
-            const d = parseDateValue(row['epi_date']);
+            const d = dateOf(row);
             return !d || fiscalYearOf(d) !== fy;
         });
     }
@@ -1535,18 +1538,12 @@ function applyAllFilters() {
                 const hasBirth = appState.headers.includes('birth');
                 if (hasBirth) {
                     const parseBirth = parseDateValue;
-                    // DEBUG: log sample to console
-                    const sample = filtered.slice(0, 3);
-                    console.log('[cohort debug] cohortStart:', cohortStart, 'cohortEnd:', cohortEnd);
-                    console.log('[cohort debug] sample birth raw:', sample.map(r => r['birth']));
-                    console.log('[cohort debug] sample birth parsed:', sample.map(r => parseBirth(r['birth'])));
                     // Step 1: cohort filter by birth date
                     filtered = filtered.filter(row => {
                         const birthDate = parseBirth(row['birth']);
                         if (!birthDate) return false;
                         return birthDate >= cohortStart && birthDate <= cohortEnd;
                     });
-                    console.log('[cohort debug] after filter count:', filtered.length);
 
                     // Tag rows with lab window and anemia flags (lab_date within birth+6m to birth+13m-1d)
                     filtered.forEach(row => {
@@ -1739,7 +1736,7 @@ function applyAllFilters() {
 }
 
 function handleSheetChange(e) {
-    loadSheetData(e.target.value);
+    loadSheetData(e.target.value).catch(err => showToast('โหลด sheet ไม่สำเร็จ: ' + err.message, 'error', 4000));
 }
 
 function handleDimensionChange() {
