@@ -1046,6 +1046,8 @@ async function loadSheetData(sheetName) {
             const offset = jsonData.length;
             oldRows.forEach((row, i) => { row.__rowIdx__ = offset + i; });
             jsonData = jsonData.concat(oldRows);
+            // Extend rawDataText so export covers historical FY rows too
+            jsonDataText = (jsonDataText || []).concat(oldRows.map(r => ({ ...r })));
             console.log(`[FY store] merged ${oldRows.length} rows from previous FY(s)`);
         }
     } catch (e) { console.warn('[FY store] error:', e.message); }
@@ -1164,15 +1166,21 @@ function renderFyBadge() {
 }
 
 async function removeCachedFY(fy) {
+    if (!confirm(`ลบข้อมูลปีงบ ${fy} ออกจาก cache?\n(สามารถโหลดคืนได้โดยอัปโหลดไฟล์ใหม่)`)) return;
     await deleteFYRows(fy);
-    // Remove rows of this FY from rawData in memory
     appState.rawData = appState.rawData.filter(row => {
         const d = parseDateValue(row['epi_date']);
         return !d || fiscalYearOf(d) !== fy;
     });
+    if (Array.isArray(appState.rawDataText)) {
+        appState.rawDataText = appState.rawDataText.filter(row => {
+            const d = parseDateValue(row['epi_date']);
+            return !d || fiscalYearOf(d) !== fy;
+        });
+    }
     renderFyBadge();
     applyAllFilters();
-    showToast(`🗑 ลบข้อมูลปีงบ ${fy} ออกจาก cache แล้ว`, 'warn', 3000);
+    showToast(`ลบข้อมูลปีงบ ${fy} ออกจาก cache แล้ว`, 'warn', 3000);
 }
 
 // Dynamic type checker
